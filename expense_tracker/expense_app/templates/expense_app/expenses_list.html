@@ -33,7 +33,7 @@
           placeholder="Максимальная сумма"
         />
       </div>
-      <div class="col-md-4">
+      <div class="col-md-3">
         <label for="keyword" class="form-label">Ключевое слово</label>
         <input
           type="text"
@@ -43,6 +43,17 @@
           value="{{ keyword }}"
           placeholder="Поиск в описании"
         />
+      </div>
+      <div class="col-md-3">
+        <label for="tag" class="form-label">Тег</label>
+        <select name="tag" id="tag" class="form-select">
+          <option value="">Все теги</option>
+          {% for tag in all_tags %}
+            <option value="{{ tag.id }}" {% if tag.id|stringformat:"s" == tag_id %}selected{% endif %}>
+              {{ tag.name }}
+            </option>
+          {% endfor %}  
+        </select>
       </div>
       <div class="col-md-2">
         <button type="submit" class="btn btn-primary mt-4">
@@ -59,46 +70,14 @@
 
 <!-- Кнопки экспорта -->
 <div class="mb-4">
-  <form method="get" action="" class="d-inline">
-    <input type="hidden" name="export" value="csv" />
-    <!-- Добавляем скрытые поля для параметров фильтрации -->
-    {% if min_amount %}<input
-      type="hidden"
-      name="min_amount"
-      value="{{ min_amount }}"
-    />{% endif %} {% if max_amount %}<input
-      type="hidden"
-      name="max_amount"
-      value="{{ max_amount }}"
-    />{% endif %} {% if keyword %}<input
-      type="hidden"
-      name="keyword"
-      value="{{ keyword }}"
-    />{% endif %}
-    <button type="submit" class="btn btn-outline-secondary">
-      <i class="bi bi-file-earmark-csv"></i> Экспорт в CSV
-    </button>
-  </form>
-
-  <form method="get" action="" class="d-inline ms-2">
-    <input type="hidden" name="export" value="pdf" />
-    {% if min_amount %}<input
-      type="hidden"
-      name="min_amount"
-      value="{{ min_amount }}"
-    />{% endif %} {% if max_amount %}<input
-      type="hidden"
-      name="max_amount"
-      value="{{ max_amount }}"
-    />{% endif %} {% if keyword %}<input
-      type="hidden"
-      name="keyword"
-      value="{{ keyword }}"
-    />{% endif %}
-    <button type="submit" class="btn btn-outline-danger">
-      <i class="bi bi-file-earmark-pdf"></i> Экспорт в PDF
-    </button>
-  </form>
+  <a href="?{% for key, value in request.GET.items %}{% if key != 'export' %}{{ key }}={{ value }}&{% endif %}{% endfor %}export=csv"
+     class="btn btn-outline-secondary me-2">
+    <i class="bi bi-file-earmark-csv"></i> Экспорт в CSV
+  </a>
+  <a href="?{% for key, value in request.GET.items %}{% if key != 'export' %}{{ key }}={{ value }}&{% endif %}{% endfor %}export=pdf"
+     class="btn btn-outline-danger">
+    <i class="bi bi-file-earmark-pdf"></i> Экспорт в PDF
+  </a>
 </div>
 
 <!-- Контейнер для динамического оповещения -->
@@ -112,6 +91,7 @@
       <th>Категория</th>
       <th>Сумма (руб.)</th>
       <th>Комментарий</th>
+      <th>Теги</th>
       <th>Действия</th>
     </tr>
   </thead>
@@ -122,6 +102,13 @@
       <td>{{ expense.category.name }}</td>
       <td>{{ expense.amount }}</td>
       <td>{{ expense.description|default:"—" }}</td>
+      <td>
+         {% for tag in expense.tags.all %}
+          <span class="badge bg-secondary me-1">{{ tag.name }}</span>
+         {% empty %}
+          -
+         {% endfor %} 
+      </td>
       <td>
         <a
           href="{% url 'edit_expense' expense.pk %}"

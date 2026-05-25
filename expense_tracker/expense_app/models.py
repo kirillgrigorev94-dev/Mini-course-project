@@ -14,6 +14,13 @@ class Category(models.Model):
         # Возвращает название категории при выводе объекта
         return self.name
 
+# Модель тегов    
+class Tag(models.Model):
+    name = models.CharField(max_length=50, verbose_name='Название тега')
+    
+    def __str__(self):
+        return self.name
+
 # Модель расхода
 class Expense(models.Model):
     # Связь с пользователем (при удалении пользователя удаляются и его расходы)
@@ -24,7 +31,9 @@ class Expense(models.Model):
     category = models.ForeignKey(Category, on_delete=models.PROTECT, verbose_name='Категория')
     # Дата расхода
     date = models.DateField(verbose_name='Дата')
-    description = models.TextField(blank=True, verbose_name='Комментарий')
+    description = models.TextField(blank=True, null=True, verbose_name='Комментарий')
+    # Связь с тегом многие ко многим
+    tags = models.ManyToManyField(Tag, blank=True, verbose_name='Теги')
 
     class Meta:
         # Сортировка расходов по дате (новые сверху)

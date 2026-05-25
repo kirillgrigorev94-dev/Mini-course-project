@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Category, Expense
+from .models import Category, Expense, Tag
 
 # Register your models here.
 
@@ -18,9 +18,9 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Expense)
 class ExpenseAdmin(admin.ModelAdmin):
-    list_display = ('user', 'amount', 'category', 'date', 'description')
-    list_filter = ('category', 'date', 'user')
-    search_fields = ('description', 'category__name')
+    list_display = ('user', 'amount', 'category', 'date', 'description', 'get_tags')
+    list_filter = ('category', 'date', 'user', 'tags')
+    search_fields = ('description', 'category__name', 'tags_name')
     date_hierarchy = 'date'
     list_per_page = 25
 
@@ -30,7 +30,7 @@ class ExpenseAdmin(admin.ModelAdmin):
             'fields': ('user', 'amount')
         }),
         ('Детали расхода', {
-            'fields': ('category', 'date', 'description'),
+            'fields': ('category', 'date', 'description', 'tags'),
             'classes': ('collapse',)
         }),
     )
@@ -43,6 +43,15 @@ class ExpenseAdmin(admin.ModelAdmin):
     def amount_formatted(self, obj):
         return f'{obj.amount} руб.'
     amount_formatted.short_description = 'Сумма'
+    
+    def get_tags(self, obj):
+        return ", ".join([tag.name for tag in obj.tags.all()])
+    get_tags.short_description = 'Теги'
 
     # Добавляем колонку с форматированной суммой в список
     list_display += ('amount_formatted',)
+
+@admin.register(Tag)
+class TagAdmin(admin.ModelAdmin):
+    list_display = ('name',)
+    search_fields = ('name',)

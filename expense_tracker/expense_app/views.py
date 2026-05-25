@@ -8,7 +8,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 from django.utils import timezone
-from .models import Expense, Category
+from .models import Expense, Category, Tag
 from .forms import ExpenseForm
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.forms import AuthenticationForm
@@ -29,9 +29,17 @@ def get_filtered_expenses(user, request):
     """Получает отфильтрованные расходы пользователя"""
     min_amount = request.GET.get('min_amount')
     max_amount = request.GET.get('max_amount')
-    keyword = request.GET.get('keyword')
+    keyword = request.GET.get('keyword', '').strip()
 
     expenses = Expense.objects.filter(user=user)
+    tag_id = request.GET.get('tag')
+    
+    if tag_id:
+        try:
+            tag_id = int(tag_id)
+            expenses = expenses.filter(tags__id=tag_id)
+        except ValueError:
+            pass
 
     if min_amount:
         try:
@@ -58,49 +66,49 @@ def index(request):
 @login_required
 def expenses_list(request):
     export_format = request.GET.get('export')
+    tag_id = request.GET.get('tag')
 
-    # Получаем отфильтрованные расходы
+    # Получаем отфильтрованные расходы (включая фильтрацию по тегам)
     expenses = get_filtered_expenses(request.user, request)
 
     if export_format == 'csv':
-        return export_to_csv(request)
+        return export_to_csv(request, expenses)  # Передаём отфильтрованные данные
     elif export_format == 'pdf':
-        return export_to_pdf(request, expenses)
+        return export_to_pdf(request, expenses)  # Передаём отфильтрованные данные
+
+    all_tags = Tag.objects.all()
 
     context = {
         'expenses': expenses,
         'min_amount': request.GET.get('min_amount'),
         'max_amount': request.GET.get('max_amount'),
         'keyword': request.GET.get('keyword'),
+        'all_tags': all_tags,
+        'tag_id': tag_id,
     }
     return render(request, 'expense_app/expenses_list.html', context)
 
 # Экспорт расходов в CSV-файл
 @login_required
-def export_to_csv(request):
+def export_to_csv(request, expenses):
     """Экспорт расходов в CSV-файл"""
-    # Получаем отфильтрованные расходы
-    expenses = get_filtered_expenses(request.user, request)
-
-    # Создаём HTTP‑ответ с правильным content-type
     response = HttpResponse(content_type='text/csv; charset=utf-8')
     response['Content-Disposition'] = 'attachment; filename="расходы.csv"'
 
-    # Настраиваем кодировку для корректного отображения кириллицы
-    response.write('\ufeff'.encode('utf-8'))  # BOM для Excel
+    # BOM для корректного отображения в Excel
+    response.write('\ufeff'.encode('utf-8'))
 
     writer = csv.writer(response)
+    writer.writerow(['Дата', 'Категория', 'Сумма (руб.)', 'Комментарий', 'Теги'])
 
-    # Записываем заголовок CSV
-    writer.writerow(['Дата', 'Категория', 'Сумма (руб.)', 'Комментарий'])
-
-    # Записываем данные расходов
     for expense in expenses:
+        tags_list = [tag.name for tag in expense.tags.all()]
         writer.writerow([
             expense.date.strftime('%d.%m.%Y'),
             expense.category.name,
-            str(expense.amount),
-            expense.description
+            f"{expense.amount:.2f}",
+            expense.description,
+            ', '.join(tags_list)
         ])
 
     return response
@@ -266,6 +274,7 @@ def add_expense(request):
             expense = form.save(commit=False)
             expense.user = request.user  # Привязываем расход к текущему пользователю
             expense.save()
+            form.save_m2m() # Сохраняем связь с тегами
             messages.success(request, 'Расход успешно добавлен!')
             return redirect('expenses_list')
     else:
