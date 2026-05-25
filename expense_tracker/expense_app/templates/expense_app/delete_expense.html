@@ -1,0 +1,42 @@
+{% extends 'expense_app/base.html' %}
+{% load static %}
+{% block title %}Удаление расхода{% endblock %}
+{% block content %}
+
+<div class="row">
+  <!-- Строка сетки Bootstrap -->
+  <div class="col-md-6 mx-auto">
+    <div class="card">
+      <div class="card-header">
+        <h4>Удаление расхода</h4>
+        <!-- Заголовок карточки -->
+      </div>
+      <div class="card-body">
+        <!-- Тело карточки — содержимое диалога подтверждения -->
+        <p>
+          Вы уверены, что хотите удалить расход на сумму
+          <strong>{{ expense.amount }} руб.</strong> от
+          <strong>{{ expense.date|date:"d.m.Y" }}</strong>?
+        </p>
+        <!-- Текст с подтверждением удаления, показывающий сумму и дату расхода -->
+
+        <form method="post">
+          {% csrf_token %}
+
+          <p class="text-danger">
+            <strong>Это действие нельзя отменить!</strong>
+          </p>
+
+          <button type="submit" class="btn btn-danger">Да, удалить</button>
+          <!-- Кнопка подтверждения удаления (опасное действие — стилизована как опасная кнопка Bootstrap) -->
+
+          <a href="{% url 'expenses_list' %}" class="btn btn-secondary"
+            >Отмена</a
+          >
+          <!-- Ссылка для отмены удаления и возврата к списку расходов -->
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

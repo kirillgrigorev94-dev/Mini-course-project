@@ -1,0 +1,177 @@
+{% extends 'expense_app/base.html' %}
+{% load static %}
+{% block title %}Главная страница{% endblock %}
+{% block content %}
+<div class="row">
+  <div class="col-md-8 mx-auto text-center">
+    <!-- Блок для отображения уведомлений -->
+    {% if messages %} {% for message in messages %}
+    <div
+      class="alert alert-{{ message.tags }} alert-dismissible fade show"
+      role="alert"
+    >
+      {{ message }}
+      <button
+        type="button"
+        class="btn-close"
+        data-bs-dismiss="alert"
+        aria-label="Close"
+      ></button>
+    </div>
+    {% endfor %} {% endif %}
+
+    <h1>Добро пожаловать в систему учёта расходов!</h1>
+    <p class="lead">
+      Здесь будут находится ваши расходы. Управляйте своими финансами легко и
+      удобно.
+    </p>
+    <hr class="my-4" />
+
+    {% if user.is_authenticated %}
+    <!-- Контент для авторизованного пользователя -->
+    <div class="alert alert-success mb-4">
+      <p><strong>Вы авторизованы как {{ user.username }}!</strong></p>
+      <p>Добавляйте расходы и следите за своими финансами.</p>
+    </div>
+
+    <!-- Первая строка карточек с основными функциями -->
+    <div class="row mb-4">
+      <div class="col-md-6 mb-3">
+        <div class="card h-100 shadow-sm">
+          <div class="card-body">
+            <h5 class="card-title">Мои расходы</h5>
+            <p class="card-text">
+              Просматривайте и редактируйте все ваши расходы.
+            </p>
+            <a href="{% url 'expenses_list' %}" class="btn btn-outline-primary"
+              >Перейти к расходам</a
+            >
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6 mb-3">
+        <div class="card h-100 shadow-sm">
+          <div class="card-body">
+            <h5 class="card-title">Добавить расход</h5>
+            <p class="card-text">
+              Быстро добавьте новый расход с указанием суммы и категории.
+            </p>
+            <a href="{% url 'add_expense' %}" class="btn btn-outline-success"
+              >Добавить расход</a
+            >
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Вторая строка карточек с дополнительными функциями -->
+    <div class="row mb-4">
+      <div class="col-md-6 mb-3">
+        <div class="card h-100 shadow-sm">
+          <div class="card-body">
+            <h5 class="card-title">Статистика</h5>
+            <p class="card-text">
+              Анализируйте свои расходы по категориям и периодам. Изучайте
+              графики своих расходов.
+            </p>
+            <a href="{% url 'statistics' %}" class="btn btn-outline-info"
+              >Посмотреть полную статистику расходов</a
+            >
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6 mb-3">
+        <div class="card h-100 shadow-sm">
+          <div class="card-body">
+            <h5 class="card-title">Экспорт данных с главной</h5>
+            <p class="card-text">
+              Подготовьте данные для экспорта в CSV прямо с главной страницы.
+            </p>
+            <form method="get" action="{% url 'expenses_list' %}">
+              <input type="hidden" name="export" value="csv" />
+              <button type="submit" class="btn btn-outline-warning">
+                <i class="bi bi-download"></i> Экспорт в CSV файл
+              </button>
+            </form>
+            <form method="get" action="{% url 'expenses_list' %}" class="mt-2">
+              <input type="hidden" name="export" value="pdf" />
+              <button type="submit" class="btn btn-outline-danger">
+                <i class="bi bi-download"></i> Экспорт в PDF файл
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+      {% else %}
+      <!-- Контент для неавторизованного пользователя -->
+      <div class="alert alert-info mb-4">
+        <p>
+          Для доступа ко всем функциям системы необходимо
+          <a href="{% url 'login' %}">войти в аккаунт</a>.
+        </p>
+        <p>
+          Используйте учётную запись администратора или создайте новый аккаунт
+          через админ‑панель.
+        </p>
+      </div>
+
+      <div class="mt-4">
+        <a href="{% url 'login' %}" class="btn btn-primary btn-lg"
+          >Войти в систему</a
+        >
+      </div>
+
+      <!-- Информация для новых пользователей -->
+      <div class="mt-5">
+        <h4>Что вы получите после регистрации:</h4>
+        <ul class="text-start mt-3">
+          <li>Полный контроль над своими расходами</li>
+          <li>Наглядную статистику в виде графиков</li>
+          <li>Возможность экспорта данных</li>
+          <li>Удобный интерфейс для ежедневного использования</li>
+        </ul>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endblock %}
+
+  <script>
+    function clearExportData() {
+      fetch('{% url "clear_export_data" %}', {
+        method: "POST",
+        headers: {
+          "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]")
+            .value,
+          "Content-Type": "application/json",
+        },
+      })
+        .then((response) => {
+          if (response.ok) location.reload();
+        })
+        .catch((error) => console.error("Ошибка очистки данных:", error));
+    }
+
+    function clearExportSuccess() {
+      fetch('{% url "clear_export_success" %}', {
+        method: "POST",
+        headers: {
+          "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]")
+            .value,
+          "Content-Type": "application/json",
+        },
+      })
+        .then((response) => {
+          if (response.ok) {
+            const alertElement = document.querySelector(
+              '.alert-success[role="alert"]',
+            );
+            if (alertElement) alertElement.remove();
+          }
+        })
+        .catch((error) => console.error("Ошибка очистки флага:", error));
+    }
+  </script>
+</div>

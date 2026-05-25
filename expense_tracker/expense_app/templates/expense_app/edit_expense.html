@@ -1,0 +1,51 @@
+{% extends 'expense_app/base.html' %}
+{% load static %}
+{% block title %}Редактирование расхода{% endblock %}
+{% block content %}
+<div class="row">
+    <!-- Строка сетки Bootstrap -->
+    <div class="col-md-6 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <h4>Редактирование расхода</h4>
+                <!-- Заголовок карточки -->
+            </div>
+            <div class="card-body">
+                <!-- Тело карточки — содержимое формы -->
+                <form method="post">
+            {% csrf_token %}
+
+            <div class="mb-3">
+                <label for="{{ form.amount.id_for_label }}" class="form-label">Сумма (руб.)</label>
+                {{ form.amount }}
+                <!-- Поле ввода суммы, генерируемое формой Django -->
+            </div>
+
+            <div class="mb-3">
+                <label for="{{ form.category.id_for_label }}" class="form-label">Категория</label>
+                {{ form.category }}
+                <!-- Выпадающий список категорий, генерируемый формой Django -->
+            </div>
+
+            <div class="mb-3">
+                <label for="{{ form.date.id_for_label }}" class="form-label">Дата</label>
+                {{ form.date }}
+                <!-- Поле ввода даты, генерируемое формой Django -->
+            </div>
+
+            <div class="mb-3">
+                <label for="{{ form.description.id_for_label }}" class="form-label">Комментарий</label>
+                <!-- Метка для текстового поля комментария -->
+                {{ form.description }}
+            </div>
+
+            <button type="submit" class="btn btn-primary">Сохранить изменения</button>
+            <!-- Кнопка отправки формы для сохранения изменений -->
+            <a href="{% url 'expenses_list' %}" class="btn btn-secondary">Отмена</a>
+            <!-- Ссылка для отмены редактирования и возврата к списку расходов -->
+        </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
