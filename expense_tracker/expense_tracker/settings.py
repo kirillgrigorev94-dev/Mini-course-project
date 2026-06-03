@@ -137,3 +137,5 @@ MESSAGE_TAGS = {
     'info': 'alert-info',
     'warning': 'alert-warning',
 }
+
+SCHEDULER_ENABLED = True  # Флаг для включения/выключения планировщика

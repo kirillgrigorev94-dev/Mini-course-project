@@ -6,7 +6,7 @@ from io import BytesIO
 import base64
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseForbidden
 from django.utils import timezone
 from .models import Expense, Category, Tag
 from .forms import ExpenseForm
@@ -449,3 +449,20 @@ def user_logout(request):
     logout(request)
     messages.success(request, 'Вы успешно вышли из системы.')
     return redirect('login')
+
+@login_required
+def run_scheduled_tasks(request):
+    """Ручное выполнение запланированных задач (для админов)"""
+    if not request.user.is_staff:
+        return HttpResponseForbidden()
+
+    from .scheduler import export_monthly_report, generate_statistics_report
+
+    task_name = request.GET.get('task')
+    if task_name == 'export':
+        export_monthly_report()
+    elif task_name == 'stats':
+        generate_statistics_report()
+
+    messages.success(request, 'Запланированные задачи выполнены')
+    return redirect('admin:index')
