@@ -4,6 +4,15 @@
 {% block content %}
 <h2>Мои расходы</h2>
 
+{% if messages %}
+  {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+  {% endfor %}
+{% endif %}
+
 <!-- Форма фильтрации -->
 <div class="card mb-4">
   <div class="card-header">
@@ -125,6 +134,72 @@
     {% endfor %}
   </tbody>
 </table>
+
+<!-- Блок пагинации -->
+{% if paginator.num_pages > 1 %}
+<nav aria-label="Навигация по страницам" class="mt-4">
+  <ul class="pagination justify-content-center">
+    <!-- Кнопка "первая" -->
+    {% if page_obj.has_previous %}
+      <li class="page-item">
+        <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page=1">
+          Первая
+        </a>
+      </li>
+    {% endif %}
+
+    <!-- Кнопка "назад" -->
+    {% if page_obj.has_previous %}
+      <li class="page-item">
+        <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}">
+          Назад
+        </a>
+      </li>
+    {% endif %}
+    
+    <!-- Текущая страница и соседние -->
+    {% for num in page_obj.paginator.page_range %}
+      {% if page_obj.number == num %}
+        <li class="page-item active" aria-current="page">
+          <span class="page-link">{{ num }}</span>
+        </li>
+      {% elif num > page_obj.number|add:-3 and num < page_obj.number|add:3 %}
+        <li class="page-item">
+          <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ num }}">
+            {{ num }}
+          </a>
+        </li>
+      {% endif %}
+    {% endfor %}
+
+    <!-- Кнопка "Вперёд" -->
+    {% if page_obj.has_next %}
+      <li class="page-item">
+        <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}">
+          Вперёд
+        </a>
+      </li>
+    {% endif %}
+
+    <!-- Кнопка "Последняя" -->
+    {% if page_obj.has_next %}
+      <li class="page-item">
+        <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ paginator.num_pages }}">
+          Последняя ({{ paginator.num_pages }})
+        </a>
+      </li>
+    {% endif %}
+  </ul>
+</nav>
+
+<!-- Информация о текущей странице -->
+<div class="text-center mt-2 white-text">
+  Страница {{ page_obj.number }} из {{ paginator.num_pages }}.
+  Показаны записи с {{ page_obj.start_index }} по {{ page_obj.end_index }}
+  из {{ paginator.count }} всего.
+</div>
+{% endif %}
+
 {% else %}
 <p class="text-muted">По вашим критериям фильтрации расходов не найдено.</p>
 {% endif %} {% endblock %} {% block extra_js %}

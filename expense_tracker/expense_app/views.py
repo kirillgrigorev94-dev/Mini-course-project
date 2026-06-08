@@ -2,28 +2,33 @@ import pandas as pd
 import matplotlib
 matplotlib.use('Agg')  # Используем неинтерактивный бэкенд для серверной среды
 import matplotlib.pyplot as plt
-from io import BytesIO
+import json
 import base64
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse, HttpResponseForbidden
-from django.utils import timezone
+import csv
+from io import BytesIO
 from .models import Expense, Category, Tag
 from .forms import ExpenseForm
+from django.db.models import Q
+from django.core.paginator import Paginator
+from django.shortcuts import render, redirect, get_object_or_404
+from django.views.decorators.csrf import csrf_exempt
+from django.http import HttpResponse, HttpResponseForbidden
+from django.utils import timezone
+from django.utils.decorators import method_decorator
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib import messages
-from django.views.decorators.csrf import csrf_exempt
-from django.utils.decorators import method_decorator
-import json
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
-import csv
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib import colors
 from reportlab.lib.colors import CMYKColor
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, LongTable, TableStyle, Paragraph, Spacer
+
 
 def get_filtered_expenses(user, request):
     """Получает отфильтрованные расходы пользователя"""
@@ -76,15 +81,22 @@ def expenses_list(request):
     elif export_format == 'pdf':
         return export_to_pdf(request, expenses)  # Передаём отфильтрованные данные
 
+    # Настройка пагинации
+    paginator = Paginator(expenses, 10) # 10 записей на страницу
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
     all_tags = Tag.objects.all()
 
     context = {
-        'expenses': expenses,
+        'expenses': page_obj,
         'min_amount': request.GET.get('min_amount'),
         'max_amount': request.GET.get('max_amount'),
         'keyword': request.GET.get('keyword'),
         'all_tags': all_tags,
         'tag_id': tag_id,
+        'paginator': paginator,
+        'page_obj': page_obj,
     }
     return render(request, 'expense_app/expenses_list.html', context)
 
@@ -115,143 +127,139 @@ def export_to_csv(request, expenses):
 
 @login_required
 def export_to_pdf(request, expenses):
-    """Экспорт расходов в PDF-файл с улучшенным форматированием и корректной таблицей"""
+    """Экспорт расходов в PDF с корректной таблицей (перенос текста, повтор заголовков)"""
 
     try:
-        # Регистрируем шрифт для поддержки кириллицы
+        # Регистрация шрифта с кириллицей
         pdfmetrics.registerFont(TTFont('DejaVuSans', 'DejaVuSans.ttf'))
         pdfmetrics.registerFont(TTFont('DejaVuSansBold', 'DejaVuSans-Bold.ttf'))
 
-        # Создаём PDF с полями 20 мм со всех сторон
         buffer = BytesIO()
-        p = canvas.Canvas(buffer, pagesize=A4)
-        width, height = A4
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            rightMargin=20*mm,
+            leftMargin=20*mm,
+            topMargin=20*mm,
+            bottomMargin=20*mm
+        )
 
-        left_margin = 20 * mm
-        top_margin = 20 * mm
-        p.translate(left_margin, top_margin)  # Сдвигаем содержимое внутрь полей
+        # Стили для текста
+        styles = getSampleStyleSheet()
+        styles.add(ParagraphStyle(
+            name='HeaderBold',
+            parent=styles['Normal'],
+            fontName='DejaVuSansBold',
+            fontSize=18,
+            spaceAfter=10,
+            leading=22
+        ))
+        styles.add(ParagraphStyle(
+            name='SubHeader',
+            parent=styles['Normal'],
+            fontName='DejaVuSans',
+            fontSize=12,
+            spaceAfter=5,
+            leading=16
+        ))
+        
+        # Отдельный стиль для колонки "Комментарии"
+        comment_style = ParagraphStyle(
+            name='Comment',
+            parent=styles['Normal'],
+            fontName='DejaVuSans',
+            fontSize=9,
+            leading=11,
+            alignment=4,
+            wordWrap='CJK'
+        )
 
-        # Шапка отчёта
-        p.setFont("DejaVuSansBold", 18)
-        p.drawString(0, height - top_margin - 30, "Мои расходы")
+        elements = []
 
-        p.setFont("DejaVuSans", 12)
-        p.drawString(0, height - top_margin - 60, f"Пользователь: {request.user.username}")
-        p.drawString(0, height - top_margin - 80, f"Дата экспорта: {timezone.now().strftime('%d.%m.%Y %H:%M')}")
-        p.drawString(0, height - top_margin - 100, f"Количество записей: {expenses.count()}")
+        # Шапка документа
+        elements.append(Paragraph("Мои расходы", styles['HeaderBold']))
+        elements.append(Paragraph(f"Пользователь: {request.user.username}", styles['SubHeader']))
+        elements.append(Paragraph(f"Дата экспорта: {timezone.now().strftime('%d.%m.%Y %H:%M')}", styles['SubHeader']))
+        elements.append(Paragraph(f"Количество записей: {expenses.count()}", styles['SubHeader']))
+        elements.append(Spacer(1, 10))
 
-        # Горизонтальная линия под шапкой
-        p.line(0, height - top_margin - 110, width - 40 * mm, height - top_margin - 110)
-
-        # Параметры таблицы
-        y_position = height - top_margin - 140
+        # Подготовка данных таблицы
         headers = ['№', 'Дата', 'Категория', 'Сумма (руб.)', 'Комментарий']
-        col_widths = [30, 80, 160, 90, 160]  # Ширина колонок в мм
-        col_positions = [sum(col_widths[:i]) for i in range(len(col_widths))]
+        data = [headers]
 
-        # Заголовки таблицы с заливкой и рамками
-        p.setFont("DejaVuSansBold", 11)
-        p.setFillColor(CMYKColor(0, 0, 0, 0.2))  # Светло‑серая заливка для заголовков
-        for i, header in enumerate(headers):
-            p.rect(col_positions[i], y_position, col_widths[i], 20, fill=1)  # Фон ячейки
-            # Вертикальные линии для заголовков
-            if i < len(headers) - 1:
-                p.line(col_positions[i + 1], y_position, col_positions[i + 1], y_position - 20)
-        # Горизонтальная линия внизу заголовков
-        p.line(0, y_position - 20, sum(col_widths), y_position - 20)
-        for i, header in enumerate(headers):
-            p.setFillColor(CMYKColor(0, 0, 0, 1))  # Чёрный текст
-            p.drawCentredString(col_positions[i] + col_widths[i] / 2, y_position + 5, header)
-
-        y_position -= 20
-
-        # Данные расходов с переносом текста в комментариях
         total_amount = 0
-        line_height = 50  # Высота строки в пунктах
-
         for idx, expense in enumerate(expenses, start=1):
-            if y_position < 50:  # Проверка на конец страницы
-                p.showPage()
-                p.translate(left_margin, top_margin)
-                y_position = height - top_margin - 60
-                # Повторяем заголовки таблицы с рамками
-                for i, header in enumerate(headers):
-                    p.rect(col_positions[i], y_position, col_widths[i], 20, fill=1)
-                    if i < len(headers) - 1:
-                        p.line(col_positions[i + 1], y_position, col_positions[i + 1], y_position - 20)
-                p.line(0, y_position - 20, sum(col_widths), y_position - 20)
-                for i, header in enumerate(headers):
-                    p.setFillColor(CMYKColor(0, 0, 0, 1))
-                    p.drawCentredString(col_positions[i] + col_widths[i] / 2, y_position + 5, header)
-                y_position -= 20
-
-            # Рисуем рамку для текущей строки
-            p.rect(0, y_position - line_height, sum(col_widths), line_height)  # Внешняя рамка строки
-
-            # Рисуем внутренние вертикальные разделители для строки данных
-            for i in range(1, len(col_positions)):
-                p.line(col_positions[i], y_position, col_positions[i], y_position - line_height)
-
-            # Данные строки
-            row_data = [
+            row = [
                 str(idx),
                 expense.date.strftime('%d.%m.%Y'),
                 expense.category.name,
                 f"{expense.amount:,.2f}".replace(',', ' '),
-                expense.description or ''
+                Paragraph(expense.description or '', comment_style)
             ]
-
-            # Отрисовка данных с переносом комментариев
-            for i, data in enumerate(row_data):
-                x = col_positions[i]
-                y = y_position - line_height + 30
-
-                if i == 4:  # Комментарий — переносим текст
-                    text = p.beginText(x + 4, y)
-                    text.setFont("DejaVuSans", 9)
-                    words = data.split()
-                    current_line = []
-                    for word in words:
-                        test_line = ' '.join(current_line + [word])
-                        if p.stringWidth(test_line, "DejaVuSans", 9) < col_widths[i] - 12:  # Увеличенный отступ для надёжности
-                            current_line.append(word)
-                        else:
-                            if current_line:
-                                text.textLine(' '.join(current_line))
-                                current_line = [word]
-                    if current_line:
-                        text.textLine(' '.join(current_line))
-                    p.drawText(text)
-                else:  # Остальные колонки — простой вывод
-                    if i == 3:  # Сумма — выравнивание по правому краю
-                        p.drawRightString(x + col_widths[i] - 6, y, data)  # Увеличенный отступ от правого края
-                    else:
-                        p.drawString(x + 6, y, data)  # Увеличенный отступ от левого края
-
+            data.append(row)
             total_amount += expense.amount
-            y_position -= line_height
 
-        # Итоговая строка с рамкой и выделением
-        if y_position >= 50:
-            p.setFont("DejaVuSansBold", 12)
-            p.setFillColor(CMYKColor(0, 0, 0, 0.5))  # Тёмно‑серая заливка
-            p.rect(sum(col_widths) - col_widths[-2] - col_widths[-1], y_position - line_height,
-                   col_widths[-2] + col_widths[-1], line_height, fill=1)
-            p.setFillColor(CMYKColor(0, 0, 0, 1))  # Чёрный текст
-            p.drawString(sum(col_widths) - col_widths[-2] - col_widths[-1] + 2,
-                         y_position - line_height + 3, "ОБЩАЯ СУММА:")
-            p.drawRightString(sum(col_widths) - 4, y_position - line_height + 3,
-                             f"{total_amount:,.2f} руб.".replace(',', ' '))
-        
-        # Нижний колонтитул
-        p.saveState()
-        p.setFont("DejaVuSans", 8)
-        p.setFillColor(CMYKColor(0, 0, 0, 0.3))  # Светло‑серый цвет
-        p.drawString(0, 20, f"Сформировано: {timezone.now().strftime('%d.%m.%Y %H:%M')}")
-        p.restoreState()
+        # Ширина колонок (в пунктах; A4 ~595 pt, с отступами остаётся ~555 pt)
+        col_widths = [25, 70, 110, 90, 226]
 
-        p.showPage()
-        p.save()
+        # Создаём LongTable (умеет разбивать по страницам и повторять заголовки)
+        table = LongTable(data, colWidths=col_widths, repeatRows=1)
+
+        # Стилизация таблицы
+        table.setStyle(TableStyle([
+            # Заливка шапки
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightsalmon),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.lightgoldenrodyellow),
+            ('FONTNAME', (0, 0), (-1, 0), 'DejaVuSansBold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 11),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, 0), 'MIDDLE'),
+
+            # Выравнивание данных
+            ('FONTNAME', (0, 1), (-1, -1), 'DejaVuSans'),
+            ('FONTSIZE', (0, 1), (-1, -1), 10),
+            ('ALIGN', (0, 1), (3, -1), 'LEFT'),          # №, Дата, Категория, Сумма — влево
+            ('ALIGN', (4, 1), (-1, -1), 'LEFT'),        # Комментарий — влево
+            ('VALIGN', (0, 1), (-1, -1), 'TOP'),
+
+            # Сетка
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.green),
+
+            # Отступы внутри ячеек
+            ('PADDING', (0, 0), (-1, -1), 4),
+        ]))
+
+        # Перенос длинных строк в комментарии работает автоматически благодаря LongTable
+        elements.append(table)
+
+        # Итоговая строка (добавляем как отдельный блок под таблицей)
+        total_style = ParagraphStyle(
+            name='Total',
+            parent=styles['Normal'],
+            fontName='DejaVuSansBold',
+            fontSize=12,
+            alignment=1,  # по центру
+            leading=16,
+            spaceBefore=10
+        )
+        elements.append(Paragraph(
+            f"ОБЩАЯ СУММА: {total_amount:,.2f} руб.".replace(',', ' '),
+            total_style
+        ))
+
+        # Нижний колонтитул через onPage
+        def add_footer(canvas, doc):
+            canvas.saveState()
+            canvas.setFont('DejaVuSans', 8)
+            canvas.setFillColor(colors.Color(0, 0, 0, 0.3))
+            canvas.drawString(
+                doc.leftMargin,
+                20,
+                f"Сформировано: {timezone.now().strftime('%d.%m.%Y %H:%M')}"
+            )
+            canvas.restoreState()
+
+        doc.build(elements, onLaterPages=add_footer)
 
         pdf = buffer.getvalue()
         buffer.close()
@@ -262,6 +270,8 @@ def export_to_pdf(request, expenses):
         return response
 
     except Exception as e:
+        import logging
+        logging.exception("Ошибка при создании PDF")
         messages.error(request, f'Ошибка при создании PDF: {e}')
         return redirect('expenses_list')
 
