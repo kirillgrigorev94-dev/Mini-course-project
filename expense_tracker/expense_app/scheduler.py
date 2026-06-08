@@ -19,12 +19,14 @@ logger = logging.getLogger(__name__)
 
 def export_monthly_report():
     """Функция для ежемесячного экспорта расходов в CSV"""
-    try:
-        logger.info("Запуск ежемесячного экспорта отчётов")
-        call_command('export_expenses_to_csv', '--monthly')
-        logger.info("Ежемесячный экспорт выполнен успешно")
-    except Exception as e:
-        logger.error(f"Ошибка при экспорте: {e}")
+    today = datetime.now().date()
+    if today.day == 1:
+        try:
+            logger.info("Запуск ежемесячного экспорта отчётов")
+            call_command('export_expenses_to_csv', '--monthly')
+            logger.info("Ежемесячный экспорт выполнен успешно")
+        except Exception as e:
+            logger.error(f"Ошибка при экспорте: {e}")
 
 def generate_statistics_report():
     """Функция для еженедельной генерации статистики"""
@@ -51,20 +53,20 @@ def cleanup_old_data():
 
 def run_scheduler():
     """Запуск планировщика"""
-    # Ежемесячный экспорт 1‑го числа в 09:00
-    schedule.every().month.on(1).at("09:00").do(export_monthly_report)
+    # Ежемесячный экспорт - запускается ежедневно, но выполняется 1‑го числа
+    schedule.every().day.at("09:00").do(export_monthly_report)
 
     # Еженедельный отчёт по статистике по понедельникам в 10:00
     schedule.every().monday.at("10:00").do(generate_statistics_report)
 
-    # Ежедневная очистка в 02:00
-    schedule.every().day.at("02:00").do(cleanup_old_data)
+    # Ежедневная очистка в 23:00
+    schedule.every().day.at("23:00").do(cleanup_old_data)
     
     # Тестовый интервал: каждые 2 минуты
     # schedule.every(2).minutes.do(export_monthly_report)
 
     # Тестовая задача каждую минуту (для отладки)
-    schedule.every(1).minutes.do(lambda: logger.info("Тестовая задача выполнена"))
+    # schedule.every(1).minutes.do(lambda: logger.info("Тестовая задача выполнена"))
 
     logger.info("Планировщик запущен. Ожидание задач...")
 
