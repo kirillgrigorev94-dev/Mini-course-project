@@ -3,6 +3,23 @@ from .models import Expense, Tag
 
 # Форма для добавления/редактирования расходов на основе модели Expense
 class ExpenseForm(forms.ModelForm):
+    """
+    Форма для добавления и редактирования расходов.
+    
+    Основана на модели 'Expense', включает поле выбора тегов в виде чекбоксов.
+
+    Поля:
+        amount (DecimalField): Сумма расходов.
+        category (ForeignKey): Категория расхода.
+        date (DateField): Дата расхода (виджет - HTML5-выбор даты).
+        description (TextField): Комментарий к расходу (текстовая область, 3 строки).
+        tags (ModelMultipleChoiceField): Теги расхода (множественный выбор, чекбоксы).
+        
+    Виджеты:
+        'date': HTML5-виджет выбора даты.
+        'description': Текстовая область с высотой 3 строки.
+        
+    """
     
     tags = forms.ModelMultipleChoiceField(
         queryset=Tag.objects.all(),

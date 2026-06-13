@@ -5,6 +5,23 @@ from .models import Category, Expense, Tag
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
+    """
+    Кастомная админ-панель для модели 'Category'.
+    
+    Особенности:
+        - Запрещает удаление категорий, связанных с расходами.
+        - Предоставляет поиск по названию категории.
+        - Ограничивает количество отображаемых записей на странице.
+
+    Атрибуты:
+        list_display (tuple): Поля, отображаемые в списке объектов.
+        search_fields (tuple): Поля для поиска.
+        list_per_page (int): Количество записей на одной странице 
+        
+    Методы:
+        has_delete_permission(request, obj): Проверяет, можно ли удалить категорию.
+    
+    """
     list_display = ('name',)
     search_fields = ('name',)
     list_per_page = 20

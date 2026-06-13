@@ -6,6 +6,20 @@ import os
 from django.conf import settings
 
 class Command(BaseCommand):
+    """
+    Команда Django management для экспорта расходов всех пользователей в CSV-формат.
+    
+    Позволяет экспортировать расходы с опциональной фильтрацией за последний месяц.
+    
+    Атрибуты:
+        help (str): Описание команды для справки (`python manage.py help`).
+
+    Методы:
+        add_arguments(parser): Добавляет аргументы командной строки.
+        handle(*args, **options): Основная ллогика выполнения команды.
+        create_fake_request(user, options): Создаёт фиктивный HTTP-запрос для фильтрации данных.
+        
+    """
     help = 'Экспорт расходов всех пользователей в CSV'
 
     def add_arguments(self, parser):

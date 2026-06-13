@@ -18,7 +18,24 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 def export_monthly_report():
-    """Функция для ежемесячного экспорта расходов в CSV"""
+    """
+    Запоскает ежемесячный экспорт расходов в CSV через Django management command.
+    
+    Выполняется только 1-го числа каждого месяца в 09:00.
+    
+    Логирует:
+        - начало выполнения задачи;
+        - успешное завершение;
+        - ошибки (если возникли).
+        
+    Использует:
+        'Django.core.management.call_command' для вызова команды 'export_expenses_to_csv --monthly'.
+        'logging' для записи событий в файл 'scheduler.log' и консоль.
+        
+    Raises:
+        Exception: Логируется как ошибка с описанием проблемы.
+    
+    """
     today = datetime.now().date()
     if today.day == 1:
         try:

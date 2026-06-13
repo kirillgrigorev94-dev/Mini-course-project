@@ -31,7 +31,26 @@ from reportlab.platypus import SimpleDocTemplate, LongTable, TableStyle, Paragra
 
 
 def get_filtered_expenses(user, request):
-    """Получает отфильтрованные расходы пользователя"""
+    """
+    Получает отфильтрованные расходы пользователя на основе параметров GET-запроса.
+    
+    Поддерживает фильтрацию по:
+        - сумме (минимальная/максимальная);
+        - ключевому слову в описании;
+        - тегу;
+        - диапазону дат (через дополнительные параметры).
+    
+    Args:
+        user (User): Объект пользователя, чьи расходы нужно отфильтровать.
+        request (HttpRequest): HTTP-запрос с параметрами фильтрации в 'request.GET'.
+        
+    Returns:
+        QuerySet: Отфильтрованный набор объектов 'Expense'.
+        
+    Raises:
+        ValueError: Если параметры 'min_amount' или 'max_amount' не могут быть преобразованны в число.
+        
+    """
     min_amount = request.GET.get('min_amount')
     max_amount = request.GET.get('max_amount')
     keyword = request.GET.get('keyword', '').strip()
@@ -103,7 +122,21 @@ def expenses_list(request):
 # Экспорт расходов в CSV-файл
 @login_required
 def export_to_csv(request, expenses):
-    """Экспорт расходов в CSV-файл"""
+    """
+    Экспортирует заданный набор расходов в CSV-файл с кодировкой UTF-8.
+    
+    Добавляет BOM для корректного отображения кириллицы в Excel.
+    
+    Args:
+        request (HttpRequest): HTTP-запрос (требуется авторизация).
+        expenses (QuerySet): Набор объектов 'Expense' для экспорта.
+        
+    Returns:
+        HttpResponse: Ответ с CSV-файлом для скачивания.
+            - Content-Type: 'text/csv; charset=utf-8'.
+            - Заголовок 'Content-Disposition' для принудительного скачивания.
+    
+    """
     response = HttpResponse(content_type='text/csv; charset=utf-8')
     response['Content-Disposition'] = 'attachment; filename="расходы.csv"'
 
