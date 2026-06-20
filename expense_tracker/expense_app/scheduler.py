@@ -53,6 +53,16 @@ def generate_statistics_report():
         logger.info("Недельный отчёт статистики сгенерирован")
     except Exception as e:
         logger.error(f"Ошибка генерации статистики: {e}")
+        
+def run_every_two_minutes():
+    """Задача, выполняемая каждые 2 минуты."""
+    try:
+        logger.info("Запуск задачи каждые 2 минуты")
+        # Здесь можно вызвать существующую команду или добавить свою логику
+        call_command('export_expenses_to_csv') # Пример вызова существующей команды
+        logger.info("Задача каждые 2 минуты выполнена успешно")
+    except Exception as e:
+        logger.error(f"Ошибка при выполнении задачи каждые 2 минуты: {e}")
 
 def cleanup_old_data():
     """Очистка старых временных файлов"""
@@ -80,7 +90,7 @@ def run_scheduler():
     schedule.every().day.at("23:00").do(cleanup_old_data)
     
     # Тестовый интервал: каждые 2 минуты
-    # schedule.every(2).minutes.do(export_monthly_report)
+    # schedule.every(2).minutes.do(run_every_two_minutes)
 
     # Тестовая задача каждую минуту (для отладки)
     # schedule.every(1).minutes.do(lambda: logger.info("Тестовая задача выполнена"))
