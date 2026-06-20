@@ -39,7 +39,7 @@ class Expense(models.Model):
 
     def __str__(self):
         # Строковое представление расхода: сумма и название категории
-        return f'{self.amount} руб. - {self.category.name}'
+        return f'Расход {self.id}: {self.amount} руб. - {self.category.name}'
     
 class ExpenseTemplate(models.Model):
     """
