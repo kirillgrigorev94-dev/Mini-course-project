@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from ... import statistics  # Импорт вашей функции статистики
+from expense_app.views import statistics  # Импорт вашей функции статистики
 
 class Command(BaseCommand):
     help = 'Генерация отчёта статистики'

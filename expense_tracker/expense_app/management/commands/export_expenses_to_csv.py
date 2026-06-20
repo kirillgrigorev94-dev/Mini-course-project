@@ -45,12 +45,15 @@ class Command(BaseCommand):
 
             # Сохраняем на диск
             today = date.today().strftime('%Y%m%d')
-            filename = f'расходы_{user.username}_{today}.csv'
+            if options['monthly']:
+                filename = f"Расходы_ежемесячные_{user.username}_{today}.csv"
+            else:
+                filename = f"Расходы_{user.username}_{today}.csv"
+            
             filepath = os.path.join(export_dir, filename)
 
             with open(filepath, 'wb') as f:
                 f.write(csv_content)
-
             self.stdout.write(self.style.SUCCESS(f'Сохранён: {filepath}'))
 
     def create_fake_request(self, user, options):
