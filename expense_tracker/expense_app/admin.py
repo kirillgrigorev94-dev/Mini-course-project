@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Category, Expense, Tag
+from .models import Category, Expense, Tag, ExpenseTemplate
 
 # Register your models here.
 
@@ -72,3 +72,70 @@ class ExpenseAdmin(admin.ModelAdmin):
 class TagAdmin(admin.ModelAdmin):
     list_display = ('name',)
     search_fields = ('name',)
+    
+@admin.register(ExpenseTemplate)
+class ExpenseTemplateAdmin(admin.ModelAdmin):
+    """Административный интерфейс для управления шаблонами расходов."""
+    
+    list_display = ('name', 'user', 'amount', 'category', 'created_at')
+    list_filter = ('category', 'created_at')
+    search_fields = ('name', 'description')
+    ordering = ('-created_at',)
+    fieldsets = (
+        ('Основная информация', {'fields': ('user', 'name')}),
+        ('Детали расхода', {'fields': ('amount', 'category', 'description')}),
+        ('Теги', {'fields': ('tags',), 'classes': ('collapse',)}),
+    )
+    
+    def get_queryset(self, request):
+        """
+        Ограничивает видимость объектов: суперпользователи видят все, обычные — только свои.
+
+        Args:
+            request: HTTP‑запрос.
+
+        Returns:
+            QuerySet: отфильтрованный набор объектов ExpenseTemplate.
+        """
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        return qs.filter(user=request.user)
+    
+    def has_change_permission(self, request, obj = None):
+        """
+        Проверяет право пользователя на изменение объекта.
+
+        Суперпользователи могут изменять любые объекты, обычные пользователи —
+        только принадлежащие им.
+
+        Args:
+            request: HTTP‑запрос.
+            obj: объект ExpenseTemplate для изменения (может быть None).
+
+        Returns:
+            bool: True, если изменение разрешено, иначе False.
+        """
+        
+        if obj is not None and not request.user.is_superuser:
+            return obj.user == request.user
+        return super().has_change_permission(request, obj)
+    
+    def has_delete_permission(self, request, obj = None):
+        """
+        Проверяет право пользователя на удаление объекта.
+
+        Суперпользователи могут удалять любые объекты, обычные пользователи —
+        только принадлежащие им.
+
+        Args:
+            request: HTTP‑запрос.
+            obj: объект ExpenseTemplate для удаления (может быть None).
+
+        Returns:
+            bool: True, если удаление разрешено, иначе False.
+        """
+        
+        if obj is not None and not request.user.is_superuser:
+            return obj.user == request.user
+        return super().has_delete_permission(request, obj)
