@@ -7,7 +7,7 @@ import base64
 import csv
 from io import BytesIO
 from .models import Expense, Category, Tag
-from .forms import ExpenseForm
+from .forms import ExpenseForm, ExpenseTemplate, ExpenseTemplateForm
 from django.db.models import Q
 from django.core.paginator import Paginator
 from django.shortcuts import render, redirect, get_object_or_404
@@ -509,3 +509,124 @@ def run_scheduled_tasks(request):
 
     messages.success(request, 'Запланированные задачи выполнены')
     return redirect('admin:index')
+
+@login_required
+def expense_templates_list(request):
+    """
+    Отображает список шаблонов расходов текущего пользователя.
+    
+    Args:
+        request (HttpRequest): HTTP-запрос с информацией о пользователе.
+        
+    Returns:
+        HttpResponse: HTML-страница со списком шаблонов расходов (шаблон expense_app/expense_templates_list.html),
+        содержащая контекст с переменной 'templates' (набор объектов ExpenseTemplate).
+    """
+    
+    templates = ExpenseTemplate.objects.filter(user=request.user)
+    return render(request, 'expense_app/expense_templates_list.html', {'templates': templates})
+
+@login_required
+def create_expense_template(request):
+    """
+    Создаёт новый шаблон расхода для текущего пользователя
+    
+    При GET-запросе отображает пустую форму для создания шаблона
+    При POST-запросе обрабатывает отправленную форму: если данные валидны,
+    сохраняет новый шаблон (привязывая его к текущему пользователю) и перенаправляет
+    на страницу со списком шаблонов; в противном случае повторно отображает форму с ошибками.
+    
+    Args:
+        request (HttpRequest): HTTP-запрос. При POST-запросе содержит данные формы ExpenseTemplateForm.
+        
+    Returns:
+        HttpResponse:
+            - При GET: HTML-страница с формой создания шаблона (шаблон expense_app/create_expense_template.html),
+            содержащая контекст с переменной 'form' (пустая форма ExpenseTemplateForm).
+            - При POST и успешной валидации: перенаправление на страницу списка шаблонов (URL 'expense_templates_list'),
+            с отображением сообщения об успехе.
+            - При POST  и неудачной валидации: HTML-страница с формой, заполненной отправленными данными и сообщениями об ошибках.
+    """
+    
+    if request.method == 'POST':
+        form = ExpenseTemplateForm(request.POST)
+        if form.is_valid():
+            template = form.save(commit=False)
+            template.user = request.user
+            template.save()
+            messages.success(request, 'Шаблон успешно создан!')
+            return redirect('expense_templates_list')
+    else:
+        form = ExpenseTemplateForm()
+    return render(request, 'expense_app/create_expense_template.html', {'form': form})
+
+@login_required
+def edit_expense_template(request, template_id):
+    template = get_object_or_404(ExpenseTemplate, id=template_id, user=request.user)
+    if request.method == 'POST':
+        form = ExpenseTemplateForm(request.POST, instance=template)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Шаблон успешно обновлён!')
+            return redirect('expense_templates_list')
+    else:
+        form = ExpenseTemplateForm(instance=template)
+    return render(request, 'expense_app/edit_expense_template.html', {'form': form, 'template': template})
+
+@login_required
+def delete_expense_template(request, template_id):
+    template = get_object_or_404(ExpenseTemplate, id=template_id, user=request.user)
+    if request.method == 'POST':
+        template.delete()
+        messages.success(request, 'Шаблон удалён!')
+        return redirect('expense_templates_list')
+    return render(request, 'expense_app/delete_expense_template.html', {'template': template})
+
+@login_required
+def add_expense_form_template(request, template_id):
+    """
+    Добавляет расход на основе выбранного шаблона.
+
+    Получает шаблон расхода по ID (для текущего пользователя), при GET‑запросе
+    отображает форму создания расхода, предварительно заполненную данными из шаблона.
+    При POST‑запросе обрабатывает отправленную форму: если данные валидны,
+    сохраняет новый расход (привязывая его к текущему пользователю) и перенаправляет
+    на страницу со списком расходов; в противном случае повторно отображает форму с ошибками.
+
+    Args:
+        request (HttpRequest): HTTP‑запрос. При POST‑запросе содержит данные формы ExpenseForm.
+        template_id (int): ID шаблона расхода (ExpenseTemplate), используемого для предварительного заполнения формы.
+
+    Returns:
+        HttpResponse:
+            - При GET: HTML‑страница с формой добавления расхода (шаблон expense_app/add_expense.html),
+              содержащая контекст с переменными:
+                * 'form' — форма ExpenseForm, предварительно заполненная данными из шаблона;
+                * 'template' — объект ExpenseTemplate, используемый для заполнения формы.
+            - При POST и успешной валидации: перенаправление на страницу списка расходов (URL 'expenses_list'),
+              с отображением сообщения об успехе.
+            - При POST и неудачной валидации: HTML‑страница с формой, заполненной отправленными данными и сообщениями об ошибках.
+
+    Raises:
+        Http404: если шаблон с указанным ID не найден или не принадлежит текущему пользователю.
+    """
+    
+    template = get_object_or_404(ExpenseTemplate, id=template_id, user=request.user)
+    if request.method == 'POST':
+        form = ExpenseForm(request.POST)
+        if form.is_valid():
+            expense = form.save(commit=False)
+            expense.user = request.user
+            expense.save()
+            form.save_m2m() # Сохранение тегов
+            messages.success(request, 'Расход успешно добавлен!')
+            return redirect('expenses_list')
+    else:
+        # Предварительно заполняем форму данными из шаблона
+        form = ExpenseForm(initial={
+            'amount': template.amount,
+            'category': template.category,
+            'description': template.description,
+            'tags': template.tags.all()
+        })
+    return render(request, 'expense_app/add_expense.html', {'form': form, 'template': template})

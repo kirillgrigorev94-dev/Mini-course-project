@@ -1,0 +1,26 @@
+{% extends 'expense_app/base.html' %}
+{% load static %}
+{% block title %}Удаление шаблона{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-md-6 mx-auto">
+    <div class="card">
+      <div class="card-header">
+        <h4>Удаление шаблона</h4>
+      </div>
+      <div class="card-body">
+        <p>Вы уверены, что хотите удалить шаблон <strong>"{{ template.name }}"</strong>?</p>
+        <form method="post">
+          {% csrf_token %}
+          <p class="text-danger">
+            <strong>Это действие нельзя отменить!</strong>
+          </p>
+          <button type="submit" class="btn btn-danger">Да, удалить</button>
+          <a href="{% url 'expense_templates_list' %}" class="btn btn-secondary">Отмена</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -104,6 +104,15 @@
           </div>
         </div>
       </div>
+      <div class="col-md-6 mb-3">
+        <div class="card h-100 shadow-sm">
+          <div class="card-body">
+            <h5 class="card-title">Шаблоны расходов</h5>
+            <p class="card-text">Создавайте шаблоны для быстрого добавления повторяющихся расходов.</p>
+            <a href="{% url 'expense_templates_list' %}" class="btn btn-outline-primary">Управление шаблонами</a>
+          </div>
+        </div>
+      </div>
       {% else %}
       <!-- Контент для неавторизованного пользователя -->
       <div class="alert alert-info mb-4">
