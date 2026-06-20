@@ -4,6 +4,7 @@
 <h2>Шаблоны расходов</h2>
 <a href="{% url 'create_expense_template' %}" class="btn btn-primary mb-3">Создать новый шаблон</a>
 
+
 {% if templates %}
 <table class="table table-striped">
     <thead>
@@ -11,6 +12,7 @@
             <th>Название</th>
             <th>Сумма</th>
             <th>Категория</th>
+            <th>Теги</th>
             <th>Действия</th>
         </tr>
     </thead>
@@ -20,6 +22,15 @@
             <td>{{ template.name }}</td>
             <td>{{ template.amount }} руб.</td>
             <td>{{ template.category.name }}</td>
+            <td>
+                {% if template.tags.all %}
+                    {% for tag in template.tags.all %}
+                <span class="badge bg-secondary me-1">{{ tag.name }}</span>
+                {% endfor %}
+            {% else %}
+                <span class="text-muted">Нет тегов</span>
+            {% endif %}
+            </td>
             <td>
                 <a href="{% url 'add_expense_from_template' template.id %}" class="btn btn-success btn-sm me-1">Использовать</a>
                 <a href="{% url 'edit_expense_template' template.id %}" class="btn btn-warning btn-sm me-1">Редактировать</a>
@@ -40,14 +51,14 @@
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                                <form method="post" action="{% url 'delete_expense_template' template.id %}">
+                        <form method="post" action="{% url 'delete_expense_template' template.id %}">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-danger">Удалить</button>
-                </form>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            <button type="submit" class="btn btn-danger">Удалить</button>
+        </form>
+            </div>
+        </div>
+    </div>
+</div>
             </td>
         </tr>
         {% endfor %}
