@@ -8,16 +8,16 @@ urlpatterns = [
     # Список расходов пользователя
     path('expenses/', views.expenses_list, name='expenses_list'),
     # Добавление нового расхода
-    path('add/', views.add_expense, name='add_expense'),
+    path('add_expense/', views.add_expense, name='add_expense'),
     # Редактирование расхода (по pk)
-    path('edit/<int:pk>/', views.edit_expense, name='edit_expense'),
+    path('edit_expense/<int:pk>/', views.edit_expense, name='edit_expense'),
     # Удаление расхода (по pk)
-    path('delete/<int:pk>/', views.delete_expense, name='delete_expense'),
+    path('delete_expense/<int:pk>/', views.delete_expense, name='delete_expense'),
     # Создание расхода на основе выбранного шаблона (по ID шаблона)
     path('templates/use/<int:template_id>/', views.add_expense_form_template, name='add_expense_from_template'),
      # Новые маршруты для редактирования и удаления
-    path('templates/edit/<int:template_id>/', views.edit_expense_template, name='edit_expense_template'),
-    path('templates/delete/<int:template_id>/', views.delete_expense_template, name='delete_expense_template'),
+    path('templates/edit/<int:pk>/', views.edit_expense_template, name='edit_expense_template'),
+    path('templates/delete/<int:pk>/', views.delete_expense_template, name='delete_expense_template'),
     # Статистика расходов с графиком
     path('statistics/', views.statistics, name='statistics'),
     # Экспорт в CSV (старый endpoint)

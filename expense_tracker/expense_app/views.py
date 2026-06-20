@@ -561,8 +561,8 @@ def create_expense_template(request):
     return render(request, 'expense_app/create_expense_template.html', {'form': form})
 
 @login_required
-def edit_expense_template(request, template_id):
-    template = get_object_or_404(ExpenseTemplate, id=template_id, user=request.user)
+def edit_expense_template(request, pk):
+    template = get_object_or_404(ExpenseTemplate, id=pk, user=request.user)
     if request.method == 'POST':
         form = ExpenseTemplateForm(request.POST, instance=template)
         if form.is_valid():
@@ -574,8 +574,8 @@ def edit_expense_template(request, template_id):
     return render(request, 'expense_app/edit_expense_template.html', {'form': form, 'template': template})
 
 @login_required
-def delete_expense_template(request, template_id):
-    template = get_object_or_404(ExpenseTemplate, id=template_id, user=request.user)
+def delete_expense_template(request, pk):
+    template = get_object_or_404(ExpenseTemplate, id=pk, user=request.user)
     if request.method == 'POST':
         template.delete()
         messages.success(request, 'Шаблон удалён!')
