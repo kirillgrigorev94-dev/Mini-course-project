@@ -39,6 +39,12 @@ class ExpenseForm(forms.ModelForm):
             'description': forms.Textarea(attrs={'rows': 3}),
         }
         
+    def clean_amount(self):
+        amount = self.cleaned_data.get('amount')
+        if amount is not None and amount < 0:
+            raise forms.ValidationError('Сумма не может быть отрицательной.')
+        return amount
+        
 class ExpenseTemplateForm(forms.ModelForm):
     """
     Форма для создания и редактирования шаблонов расходов (ExpenseTemplate).
