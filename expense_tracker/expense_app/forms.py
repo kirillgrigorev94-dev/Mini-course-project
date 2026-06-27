@@ -33,6 +33,7 @@ class ExpenseForm(forms.ModelForm):
         fields = ['amount', 'category', 'date', 'description', 'tags']  # Перечисляем поля модели, которые будут отображаться в форме
 
         widgets = {
+            'amount': forms.NumberInput(attrs={'min': '0', 'step': '0.01'}),
             # Настраиваем виджет для поля 'date': используем HTML5‑виджет выбора даты
             'date': forms.DateInput(attrs={'type': 'date'}),
             # Настраиваем виджет для поля 'description': текстовая область с высотой в 3 строки
@@ -65,5 +66,12 @@ class ExpenseTemplateForm(forms.ModelForm):
         model = ExpenseTemplate
         fields = ['name', 'amount', 'category', 'description', 'tags']
         widgets = {
+            'amount': forms.NumberInput(attrs={'min': '0', 'step': '0.01'}),
             'description': forms.Textarea(attrs={'rows': 3}),
         }
+        
+    def clean_amount(self):
+        amount = self.cleaned_data.get('amount')
+        if amount is not None and amount < 0:
+            raise forms.ValidationError('Сумма в шаблоне не может быть отрицательной.')
+        return amount

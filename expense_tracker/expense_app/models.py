@@ -2,6 +2,7 @@
 
 from django.db import models
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 
 # Модель категории расходов
 class Category(models.Model):
@@ -32,6 +33,11 @@ class Expense(models.Model):
     description = models.TextField(blank=True, null=True, verbose_name='Комментарий')
     # Связь с тегом многие ко многим
     tags = models.ManyToManyField(Tag, blank=True, verbose_name='Теги')
+    
+    def clean(self):
+        super().clean()
+        if self.amount is not None and self.amount < 0:
+            raise ValidationError({'amount': 'Сумма не может быть отрицательной.'})
 
     class Meta:
         # Сортировка расходов по дате (новые сверху)
@@ -64,6 +70,11 @@ class ExpenseTemplate(models.Model):
     description = models.TextField(blank=True, null=True, verbose_name='Комментарий')
     tags = models.ManyToManyField(Tag, blank=True, verbose_name='Теги')
     created_at = models.DateTimeField(auto_now_add=True)
+    
+    def clean(self):
+        super().clean()
+        if self.amount is not None and self.amount < 0:
+            raise ValidationError({'amount': 'Сумма не может быть отрицательной.'})
     
     def __str__(self):
         return self.name

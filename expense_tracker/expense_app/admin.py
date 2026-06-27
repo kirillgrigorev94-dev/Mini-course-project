@@ -51,6 +51,11 @@ class ExpenseAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+    
+    def save_model(self, request, obj, form, change):
+        # Вызываем валидацию модели перед сохранением
+        obj.full_clean() # запустит метод clean()
+        super().save_model(request, obj, form, change)
 
     # Оптимизация запросов к БД
     def get_queryset(self, request):
@@ -86,6 +91,11 @@ class ExpenseTemplateAdmin(admin.ModelAdmin):
         ('Детали расхода', {'fields': ('amount', 'category', 'description')}),
         ('Теги', {'fields': ('tags',), 'classes': ('collapse',)}),
     )
+    
+    def save_model(self, request, obj, form, change):
+        # Вызываем валидацию модели перед сохранением
+        obj.full_clean() # запустит метод clean()
+        super().save_model(request, obj, form, change)
     
     def get_queryset(self, request):
         """
