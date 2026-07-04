@@ -348,6 +348,9 @@ def add_expense(request):
             form.save_m2m() # Сохраняем связь с тегами
             messages.success(request, 'Расход успешно добавлен!')
             return redirect('expenses_list')
+        else:
+            # Если есть ошибки, форма вернется в шаблон с заполненными данными и списком ошибок
+            return render(request, 'expense_app/add_expense.html', {'form': form})
     else:
         form = ExpenseForm()
         form.user = request.user

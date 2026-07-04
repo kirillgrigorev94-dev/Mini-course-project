@@ -34,6 +34,7 @@ class ExpenseForm(forms.ModelForm):
 
         widgets = {
             'amount': forms.NumberInput(attrs={'min': '0', 'step': '0.01'}),
+            'category': forms.Select(attrs={'class': 'form-select'}),
             # Настраиваем виджет для поля 'date': используем HTML5‑виджет выбора даты
             'date': forms.DateInput(attrs={'type': 'date'}),
             # Настраиваем виджет для поля 'description': текстовая область с высотой в 3 строки
