@@ -29,23 +29,6 @@ class Tag(models.Model):
     
     def __str__(self):
         return self.name
-    
-def get_category_spent_this_month(user, category):
-    """
-    Возвращает сумму расходов пользователя за текущий календарный месяц
-    по данной категории: с 1-го числа по сегодня включительно.
-    """
-    today = date.today()
-    first_day_of_month = date(today.year, today.month, 1)
-
-    result = Expense.objects.filter(
-        user=user,
-        category=category,
-        date__gte=first_day_of_month,
-        date__lte=today,
-    ).aggregate(total=Sum('amount'))['total']
-
-    return result if result is not None else 0
 
 # Модель расхода
 class Expense(models.Model):
@@ -105,3 +88,20 @@ class ExpenseTemplate(models.Model):
 
     def __str__(self):
         return self.name
+    
+def get_category_spent_this_month(user, category):
+    """
+    Возвращает сумму расходов пользователя за текущий календарный месяц
+    по данной категории: с 1-го числа по сегодня включительно.
+    """
+    today = date.today()
+    first_day_of_month = date(today.year, today.month, 1)
+
+    result = Expense.objects.filter(
+        user=user,
+        category=category,
+        date__gte=first_day_of_month,
+        date__lte=today,
+    ).aggregate(total=Sum('amount'))['total']
+
+    return result if result is not None else 0

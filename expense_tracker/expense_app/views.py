@@ -142,6 +142,7 @@ def expenses_list(request):
         'tag_id': tag_id,
         'paginator': paginator,
         'page_obj': page_obj,
+        'categories_data': categories_data,
     }
     return render(request, 'expense_app/expenses_list.html', context)
 
