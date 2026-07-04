@@ -6,9 +6,10 @@ import json
 import base64
 import csv
 from io import BytesIO
-from .models import Expense, Category, Tag
+from .models import Expense, Category, Tag, get_category_spent_this_month
 from .forms import ExpenseForm, ExpenseTemplate, ExpenseTemplateForm
-from django.db.models import Q
+from datetime import date
+from django.db.models import Q, Sum
 from django.core.paginator import Paginator
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
@@ -99,6 +100,31 @@ def expenses_list(request):
         return export_to_csv(request, expenses)  # Передаём отфильтрованные данные
     elif export_format == 'pdf':
         return export_to_pdf(request, expenses)  # Передаём отфильтрованные данные
+    
+# --- ДОБАВЛЕНО: расчёт лимитов по категориям ---
+    categories_data = []
+    for category in Category.objects.all():
+        spent = get_category_spent_this_month(request.user, category)
+        limit = category.monthly_limit
+        percent = 0.0
+        status = 'ok'  # ok / warning / over
+        if limit and limit > 0:
+            percent = min(100.0, (spent / limit) * 100)
+            if percent >= 100:
+                status = 'over'
+            elif percent >= 80:
+                status = 'warning'
+        else:
+            # Если лимита нет — считаем как «без лимита», статус нейтральный
+            status = 'no_limit'
+
+        categories_data.append({
+            'category': category,
+            'spent': spent,
+            'limit': limit,
+            'percent': percent,
+            'status': status,
+        })
 
     # Настройка пагинации
     paginator = Paginator(expenses, 10) # 10 записей на страницу
@@ -313,6 +339,7 @@ def export_to_pdf(request, expenses):
 def add_expense(request):
     if request.method == 'POST':
         form = ExpenseForm(request.POST)
+        form.user = request.user  # передаём пользователя в форму для валидации лимитов
         if form.is_valid():
             expense = form.save(commit=False)
             expense.user = request.user  # Привязываем расход к текущему пользователю
@@ -322,11 +349,8 @@ def add_expense(request):
             return redirect('expenses_list')
     else:
         form = ExpenseForm()
-    return render(
-        request,
-        'expense_app/add_expense.html',
-        {'form': form}
-    )
+        form.user = request.user
+    return render(request, 'expense_app/add_expense.html', {'form': form})
     
 # Редактирование расхода
 @login_required
@@ -335,18 +359,15 @@ def edit_expense(request, pk):
 
     if request.method == 'POST':
         form = ExpenseForm(request.POST, instance=expense)
+        form.user = request.user
         if form.is_valid():
             form.save()
             messages.success(request, 'Расход успешно обновлён!')
             return redirect('expenses_list')
     else:
         form = ExpenseForm(instance=expense)
-
-    return render(
-        request,
-        'expense_app/edit_expense.html',
-        {'form': form, 'expense': expense}
-    )
+        form.user = request.user
+    return render(request, 'expense_app/edit_expense.html', {'form': form, 'expense': expense})
     
 # Удаление расхода
 @login_required
@@ -409,13 +430,14 @@ def statistics(request):
             'total_sum': 0,
             'category_percentages': {},
             'graphic': None,
+            'categories_data': [],
             'start_date': start_date,
             'end_date': end_date,
             'no_data': True
         }
         return render(request, 'expense_app/statistics.html', context)
 
-    # Преобразуем данные в DataFrame для анализа
+    # Преобразуем данные в DataFrame для анализа (график)
     data = []
     for expense in expenses:
         data.append({
@@ -459,11 +481,58 @@ def statistics(request):
         graphic = None
 
     plt.close()  # Закрываем фигуру, освобождая память
+
+    # --- ДОБАВЛЕНО: расчёт лимитов по всем категориям (текущий месяц) ---
+    today = date.today()
+    first_day_of_month = date(today.year, today.month, 1)
+
+    categories_data = []
+    for category in Category.objects.all():
+        # Считаем потраченное за текущий месяц по категории
+        qs = Expense.objects.filter(
+            user=request.user,
+            category=category,
+            date__gte=first_day_of_month,
+            date__lte=today,
+        )
+        total = qs.aggregate(total=Sum('amount'))['total'] or 0
+        spent = total
+
+        limit = category.monthly_limit
+        percent = 0.0
+        status_text = ""
+        status_class = "bg-secondary"  # нейтральный
+
+        if limit and limit > 0:
+            percent = min(100.0, (spent / limit) * 100)
+            if percent >= 100:
+                status_text = "Превышение лимита"
+                status_class = "bg-danger text-white"
+            elif percent >= 80:
+                status_text = "Приближение к лимиту"
+                status_class = "bg-warning text-dark"
+            else:
+                status_text = "В пределах лимита"
+                status_class = "bg-success text-white"
+        else:
+            status_text = "Лимит не установлен"
+            status_class = "bg-light text-dark"
+
+        categories_data.append({
+            "category": category,
+            "spent": spent,
+            "limit": limit,
+            "percent": percent,
+            "status_text": status_text,
+            "status_class": status_class,
+        })
+
     context = {
         'category_stats': category_stats.to_dict() if not category_stats.empty else {},
         'total_sum': total_sum,
         'category_percentages': category_percentages.to_dict() if not category_percentages.empty else {},
         'graphic': graphic,
+        'categories_data': categories_data,
         'start_date': start_date,
         'end_date': end_date,
         'no_data': False

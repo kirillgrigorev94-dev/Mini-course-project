@@ -1,5 +1,5 @@
 from django import forms
-from .models import Expense, Tag, ExpenseTemplate
+from .models import Expense, Tag, ExpenseTemplate, get_category_spent_this_month
 
 # Форма для добавления/редактирования расходов на основе модели Expense
 class ExpenseForm(forms.ModelForm):
@@ -45,6 +45,39 @@ class ExpenseForm(forms.ModelForm):
         if amount is not None and amount < 0:
             raise forms.ValidationError('Сумма не может быть отрицательной.')
         return amount
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        amount = cleaned_data.get('amount')
+        category = cleaned_data.get('category')
+        user = getattr(self, 'user', None)  # предполагаем, что view установит user в форму
+
+        if not user or not category or amount is None:
+            return cleaned_data
+
+        limit = category.monthly_limit
+        if not limit:
+            # Если лимита нет — ничего не проверяем
+            return cleaned_data
+
+        # Считаем уже потраченное за месяц (без учёта текущего расхода, если это редактирование)
+        spent_before = get_category_spent_this_month(user, category)
+
+        # Если это редактирование существующего расхода, вычитаем его старую сумму из spent_before
+        if self.instance and self.instance.pk:
+            spent_before -= self.instance.amount
+
+        new_total = spent_before + amount
+
+        if new_total > limit:
+            self.add_error(
+                'amount',
+                f'Превышение месячного лимита категории "{category.name}": '
+                f'лимит {limit} руб., уже потрачено {spent_before} руб. '
+                f'(с учётом этого расхода будет {new_total} руб.).'
+            )
+
+        return cleaned_data
         
 class ExpenseTemplateForm(forms.ModelForm):
     """
