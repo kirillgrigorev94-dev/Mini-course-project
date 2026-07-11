@@ -34,4 +34,6 @@ urlpatterns = [
     path('templates/', views.expense_templates_list, name='expense_templates_list'),
     # Форма создания нового шаблона расхода
     path('templates/create/', views.create_expense_template, name='create_expense_template'),
+    # Регистрация пользователей
+    path('register/', views.register, name='register'),
 ]

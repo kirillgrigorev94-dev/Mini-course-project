@@ -18,7 +18,7 @@ from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.forms import AuthenticationForm
+from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.contrib import messages
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
@@ -520,6 +520,18 @@ def statistics(request):
         'no_data': False
     }
     return render(request, 'expense_app/statistics.html', context)
+
+def register(request):
+    if request.method == 'POST':
+        form = UserCreationForm(request.POST)
+        if form.is_valid():
+            form.save()
+            username = form.cleaned_data.get('username')
+            messages.success(request, f'Пользователь {username} успешно создан! Теперь вы можете войти.')
+            return redirect('login')
+    else:
+        form = UserCreationForm()
+    return render(request, 'expense_app/register.html', {'form': form})
 
 # Авторизация пользователя
 def user_login(request):
