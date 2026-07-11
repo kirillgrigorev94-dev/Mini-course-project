@@ -41,6 +41,11 @@ class ExpenseForm(forms.ModelForm):
             'description': forms.Textarea(attrs={'rows': 3}),
         }
         
+    def __init__(self, *args, **kwargs):
+        # Извлекаем user из kwargs, если передан
+        self.user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+        
     def clean_amount(self):
         amount = self.cleaned_data.get('amount')
         if amount is not None and amount < 0:
@@ -51,20 +56,19 @@ class ExpenseForm(forms.ModelForm):
         cleaned_data = super().clean()
         amount = cleaned_data.get('amount')
         category = cleaned_data.get('category')
-        user = getattr(self, 'user', None)  # предполагаем, что view установит user в форму
 
-        if not user or not category or amount is None:
+        # Теперь self.user доступен благодаря __init__
+        if not self.user or not category or amount is None:
             return cleaned_data
 
         limit = category.monthly_limit
         if not limit:
-            # Если лимита нет — ничего не проверяем
             return cleaned_data
 
-        # Считаем уже потраченное за месяц (без учёта текущего расхода, если это редактирование)
-        spent_before = get_category_spent_this_month(user, category)
+        # Считаем уже потраченное за месяц
+        spent_before = get_category_spent_this_month(self.user, category)
 
-        # Если это редактирование существующего расхода, вычитаем его старую сумму из spent_before
+        # Если это редактирование существующего расхода, вычитаем его старую сумму
         if self.instance and self.instance.pk:
             spent_before -= self.instance.amount
 

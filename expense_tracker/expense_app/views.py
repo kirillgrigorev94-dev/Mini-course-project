@@ -317,7 +317,7 @@ def export_to_pdf(request):
 @login_required
 def add_expense(request):
     if request.method == 'POST':
-        form = ExpenseForm(request.POST)
+        form = ExpenseForm(request.POST, user=request.user)
         form.user = request.user  # передаём пользователя в форму для валидации лимитов
         if form.is_valid():
             expense = form.save(commit=False)
@@ -330,7 +330,7 @@ def add_expense(request):
             # Если есть ошибки, форма вернется в шаблон с заполненными данными и списком ошибок
             return render(request, 'expense_app/add_expense.html', {'form': form})
     else:
-        form = ExpenseForm()
+        form = ExpenseForm(user=request.user)
         form.user = request.user
     return render(request, 'expense_app/add_expense.html', {'form': form})
     
@@ -347,7 +347,7 @@ def edit_expense(request, pk):
             messages.success(request, 'Расход успешно обновлён!')
             return redirect('expenses_list')
     else:
-        form = ExpenseForm(instance=expense)
+        form = ExpenseForm(instance=expense, user=request.user)
         form.user = request.user
     return render(request, 'expense_app/edit_expense.html', {'form': form, 'expense': expense})
     
