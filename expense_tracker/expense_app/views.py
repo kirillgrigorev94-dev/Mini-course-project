@@ -97,9 +97,9 @@ def expenses_list(request):
     expenses = get_filtered_expenses(request.user, request)
 
     if export_format == 'csv':
-        return export_to_csv(request, expenses)  # Передаём отфильтрованные данные
+        return export_to_csv(request)  # Передаём отфильтрованные данные
     elif export_format == 'pdf':
-        return export_to_pdf(request, expenses)  # Передаём отфильтрованные данные
+        return export_to_pdf(request)  # Передаём отфильтрованные данные
     
 # --- ДОБАВЛЕНО: расчёт лимитов по категориям ---
     categories_data = []
@@ -148,26 +148,18 @@ def expenses_list(request):
 
 # Экспорт расходов в CSV-файл
 @login_required
-def export_to_csv(request, expenses):
+def export_to_csv(request):
     """
-    Экспортирует заданный набор расходов в CSV-файл с кодировкой UTF-8.
-    
-    Добавляет BOM для корректного отображения кириллицы в Excel.
-    
-    Args:
-        request (HttpRequest): HTTP-запрос (требуется авторизация).
-        expenses (QuerySet): Набор объектов 'Expense' для экспорта.
-        
-    Returns:
-        HttpResponse: Ответ с CSV-файлом для скачивания.
-            - Content-Type: 'text/csv; charset=utf-8'.
-            - Заголовок 'Content-Disposition' для принудительного скачивания.
-    
+    Экспортирует отфильтрованные расходы текущего пользователя в CSV-файл.
+    Фильтрация выполняется по тем же правилам, что и в expenses_list.
     """
+    # Получаем отфильтрованные расходы точно так же, как в expenses_list
+    expenses = get_filtered_expenses(request.user, request)
+
     response = HttpResponse(content_type='text/csv; charset=utf-8')
     response['Content-Disposition'] = 'attachment; filename="расходы.csv"'
 
-    # BOM для корректного отображения в Excel
+    # BOM для корректного отображения кириллицы в Excel
     response.write('\ufeff'.encode('utf-8'))
 
     writer = csv.writer(response)
@@ -186,10 +178,13 @@ def export_to_csv(request, expenses):
     return response
 
 @login_required
-def export_to_pdf(request, expenses):
+def export_to_pdf(request):
     """Экспорт расходов в PDF с корректной таблицей (перенос текста, повтор заголовков)"""
 
     try:
+        # Получаем отфильтрованные расходы
+        expenses = get_filtered_expenses(request.user, request)
+
         # Регистрация шрифта с кириллицей
         pdfmetrics.registerFont(TTFont('DejaVuSans', 'DejaVuSans.ttf'))
         pdfmetrics.registerFont(TTFont('DejaVuSansBold', 'DejaVuSans-Bold.ttf'))
@@ -204,7 +199,6 @@ def export_to_pdf(request, expenses):
             bottomMargin=20*mm
         )
 
-        # Стили для текста
         styles = getSampleStyleSheet()
         styles.add(ParagraphStyle(
             name='HeaderBold',
@@ -222,8 +216,7 @@ def export_to_pdf(request, expenses):
             spaceAfter=5,
             leading=16
         ))
-        
-        # Отдельный стиль для колонки "Комментарии"
+
         comment_style = ParagraphStyle(
             name='Comment',
             parent=styles['Normal'],
@@ -236,14 +229,12 @@ def export_to_pdf(request, expenses):
 
         elements = []
 
-        # Шапка документа
         elements.append(Paragraph("Мои расходы", styles['HeaderBold']))
         elements.append(Paragraph(f"Пользователь: {request.user.username}", styles['SubHeader']))
         elements.append(Paragraph(f"Дата экспорта: {timezone.now().strftime('%d.%m.%Y %H:%M')}", styles['SubHeader']))
         elements.append(Paragraph(f"Количество записей: {expenses.count()}", styles['SubHeader']))
         elements.append(Spacer(1, 10))
 
-        # Подготовка данных таблицы
         headers = ['№', 'Дата', 'Категория', 'Сумма (руб.)', 'Комментарий']
         data = [headers]
 
@@ -259,15 +250,10 @@ def export_to_pdf(request, expenses):
             data.append(row)
             total_amount += expense.amount
 
-        # Ширина колонок (в пунктах; A4 ~595 pt, с отступами остаётся ~555 pt)
         col_widths = [25, 70, 110, 90, 226]
-
-        # Создаём LongTable (умеет разбивать по страницам и повторять заголовки)
         table = LongTable(data, colWidths=col_widths, repeatRows=1)
 
-        # Стилизация таблицы
         table.setStyle(TableStyle([
-            # Заливка шапки
             ('BACKGROUND', (0, 0), (-1, 0), colors.lightsalmon),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.lightgoldenrodyellow),
             ('FONTNAME', (0, 0), (-1, 0), 'DejaVuSansBold'),
@@ -275,30 +261,24 @@ def export_to_pdf(request, expenses):
             ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
             ('VALIGN', (0, 0), (-1, 0), 'MIDDLE'),
 
-            # Выравнивание данных
             ('FONTNAME', (0, 1), (-1, -1), 'DejaVuSans'),
             ('FONTSIZE', (0, 1), (-1, -1), 10),
-            ('ALIGN', (0, 1), (3, -1), 'LEFT'),          # №, Дата, Категория, Сумма — влево
-            ('ALIGN', (4, 1), (-1, -1), 'LEFT'),        # Комментарий — влево
+            ('ALIGN', (0, 1), (3, -1), 'LEFT'),
+            ('ALIGN', (4, 1), (-1, -1), 'LEFT'),
             ('VALIGN', (0, 1), (-1, -1), 'TOP'),
 
-            # Сетка
             ('GRID', (0, 0), (-1, -1), 0.5, colors.green),
-
-            # Отступы внутри ячеек
             ('PADDING', (0, 0), (-1, -1), 4),
         ]))
 
-        # Перенос длинных строк в комментарии работает автоматически благодаря LongTable
         elements.append(table)
 
-        # Итоговая строка (добавляем как отдельный блок под таблицей)
         total_style = ParagraphStyle(
             name='Total',
             parent=styles['Normal'],
             fontName='DejaVuSansBold',
             fontSize=12,
-            alignment=1,  # по центру
+            alignment=1,
             leading=16,
             spaceBefore=10
         )
@@ -307,7 +287,6 @@ def export_to_pdf(request, expenses):
             total_style
         ))
 
-        # Нижний колонтитул через onPage
         def add_footer(canvas, doc):
             canvas.saveState()
             canvas.setFont('DejaVuSans', 8)
@@ -334,7 +313,6 @@ def export_to_pdf(request, expenses):
         logging.exception("Ошибка при создании PDF")
         messages.error(request, f'Ошибка при создании PDF: {e}')
         return redirect('expenses_list')
-
 # Добавление нового расхода
 @login_required
 def add_expense(request):
