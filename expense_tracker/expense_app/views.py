@@ -31,6 +31,105 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, LongTable, TableStyle, Paragraph, Spacer
 
 
+def get_date_range(request):
+    """
+    Возвращает start_date, end_date из GET-параметров.
+    Если start_date не передан — считаем с самого начала.
+    Если end_date не передан — считаем по сегодня включительно.
+    """
+    start_date_str = request.GET.get('start_date')
+    end_date_str = request.GET.get('end_date')
+
+    start_date = None
+    if start_date_str:
+        try:
+            start_date = date.fromisoformat(start_date_str)
+        except ValueError:
+            # Если дата некорректна — игнорируем её
+            start_date = None
+
+    end_date = None
+    if end_date_str:
+        try:
+            end_date = date.fromisoformat(end_date_str)
+        except ValueError:
+            end_date = None
+
+    # Если конец не задан — считаем «по сегодня включительно»
+    if not end_date:
+        end_date = timezone.now().date()
+
+    return start_date, end_date
+
+
+def calculate_category_limits_data(user, start_date=None, end_date=None):
+    """
+    Рассчитывает данные по лимитам для всех категорий за указанный период.
+
+    Параметры:
+        user: пользователь
+        start_date: начало периода (date или None)
+        end_date: конец периода (date)
+
+    Возвращает список словарей:
+        {
+            'category': Category,
+            'spent': Decimal,
+            'limit': Decimal или None,
+            'percent': float,
+            'status_text': str,
+            'status_class': str
+        }
+    """
+    categories_data = []
+
+    for category in Category.objects.all():
+        qs = Expense.objects.filter(
+            user=user,
+            category=category,
+        )
+
+        if start_date:
+            qs = qs.filter(date__gte=start_date)
+        if end_date:
+            qs = qs.filter(date__lte=end_date)
+
+        total = qs.aggregate(total=Sum('amount'))['total'] or 0
+        spent = total
+
+        limit = category.monthly_limit
+        percent = 0.0
+        status_text = ""
+        status_class = "bg-secondary text-dark"
+
+        # Логика статуса лимита
+        if limit and limit > 0:
+            percent = min(100.0, (spent / limit) * 100)
+            if percent >= 100:
+                status_text = "Превышение лимита"
+                status_class = "bg-danger text-white"
+            elif percent >= 80:
+                status_text = "Приближение к лимиту"
+                status_class = "bg-warning text-dark"
+            else:
+                status_text = "В пределах лимита"
+                status_class = "bg-success text-white"
+        else:
+            status_text = "Лимит не установлен"
+            status_class = "bg-light text-dark"
+
+        categories_data.append({
+            "category": category,
+            "spent": spent,
+            "limit": limit,
+            "percent": percent,
+            "status_text": status_text,
+            "status_class": status_class,
+        })
+
+    return categories_data
+
+
 def get_filtered_expenses(user, request):
     """
     Получает отфильтрованные расходы пользователя на основе параметров GET-запроса.
@@ -92,14 +191,26 @@ def index(request):
 def expenses_list(request):
     export_format = request.GET.get('export')
     tag_id = request.GET.get('tag')
+    
+    # Получаем диапазон дат
+    start_date, end_date = get_date_range(request)
 
     # Получаем отфильтрованные расходы (включая фильтрацию по тегам)
     expenses = get_filtered_expenses(request.user, request)
+    
+    # Применяем фильтрацию по датам
+    if start_date:
+        expenses = expenses.filter(date_gte=start_date)
+    if end_date:
+        expenses = expenses.filter(date_lte=end_date)
 
     if export_format == 'csv':
         return export_to_csv(request)  # Передаём отфильтрованные данные
     elif export_format == 'pdf':
         return export_to_pdf(request)  # Передаём отфильтрованные данные
+    
+    # Считаем лимиты за выбранный период
+    categories_data = calculate_category_limits_data(request.user, start_date, end_date)
     
 # --- ДОБАВЛЕНО: расчёт лимитов по категориям ---
     categories_data = []
@@ -143,6 +254,9 @@ def expenses_list(request):
         'paginator': paginator,
         'page_obj': page_obj,
         'categories_data': categories_data,
+        # Передаём даты, чтобы форма в шаблоне сохраняла выбор
+        'start_date': request.GET.get('start_date'),
+        'end_date': request.GET.get('end_date'),
     }
     return render(request, 'expense_app/expenses_list.html', context)
 
@@ -393,19 +507,19 @@ def download_csv(request):
     
 @login_required
 def statistics(request):
-    start_date = request.GET.get('start_date')
-    end_date = request.GET.get('end_date')
+    # Получаем диапазон дат из GET-параметров
+    start_date, end_date = get_date_range(request)
 
     # Фильтруем расходы по пользователю и категории
     expenses = Expense.objects.filter(user=request.user).select_related('category')
 
-    # Применяем фильтрацию по датам, если указаны
+    # Применяем фильтрацию по датам
     if start_date:
         expenses = expenses.filter(date__gte=start_date)
     if end_date:
         expenses = expenses.filter(date__lte=end_date)
 
-    # Если данных нет, возвращаем пустой контекст
+    # Если данных нет — возвращаем пустой контекст с флагами
     if not expenses.exists():
         context = {
             'category_stats': {},
@@ -413,9 +527,10 @@ def statistics(request):
             'category_percentages': {},
             'graphic': None,
             'categories_data': [],
-            'start_date': start_date,
-            'end_date': end_date,
-            'no_data': True
+            # Передаём даты в формате ISO, чтобы форма в шаблоне их подхватила
+            'start_date': start_date.isoformat() if start_date else None,
+            'end_date': end_date.isoformat() if end_date else None,
+            'no_data': True,
         }
         return render(request, 'expense_app/statistics.html', context)
 
@@ -425,7 +540,7 @@ def statistics(request):
         data.append({
             'category': expense.category.name if expense.category else 'Без категории',
             'amount': float(expense.amount),
-            'date': expense.date
+            'date': expense.date,
         })
     df = pd.DataFrame(data)
 
@@ -433,81 +548,36 @@ def statistics(request):
     category_stats = df.groupby('category')['amount'].sum()
     total_sum = category_stats.sum()
 
-    # Рассчитываем доли в процентах
+    # Считаем проценты по категориям
     if total_sum > 0:
         category_percentages = (category_stats / total_sum * 100).round(1)
     else:
         category_percentages = pd.Series()
 
-    # Строим график распределения расходов
+    # Строим график
+    graphic = None
     try:
         plt.figure(figsize=(10, 6))
         if len(category_stats) > 0:
             plt.pie(
                 category_stats,
                 labels=category_stats.index,
-                autopct='%1.1f%%'
+                autopct='%1.1f%%',
             )
             plt.title('Распределение расходов по категориям')
-            # Сохраняем график в base64 для передачи в шаблон
             buffer = BytesIO()
             plt.savefig(buffer, format='png', bbox_inches='tight')
             buffer.seek(0)
             image_png = buffer.getvalue()
             buffer.close()
             graphic = base64.b64encode(image_png).decode('utf-8')
-        else:
-            graphic = None
     except Exception as e:
         print(f'Ошибка при построении графика: {e}')
-        graphic = None
+    finally:
+        plt.close()
 
-    plt.close()  # Закрываем фигуру, освобождая память
-
-    # --- ДОБАВЛЕНО: расчёт лимитов по всем категориям (текущий месяц) ---
-    today = date.today()
-    first_day_of_month = date(today.year, today.month, 1)
-
-    categories_data = []
-    for category in Category.objects.all():
-        # Считаем потраченное за текущий месяц по категории
-        qs = Expense.objects.filter(
-            user=request.user,
-            category=category,
-            date__gte=first_day_of_month,
-            date__lte=today,
-        )
-        total = qs.aggregate(total=Sum('amount'))['total'] or 0
-        spent = total
-
-        limit = category.monthly_limit
-        percent = 0.0
-        status_text = ""
-        status_class = "bg-secondary"  # нейтральный
-
-        if limit and limit > 0:
-            percent = min(100.0, (spent / limit) * 100)
-            if percent >= 100:
-                status_text = "Превышение лимита"
-                status_class = "bg-danger text-white"
-            elif percent >= 80:
-                status_text = "Приближение к лимиту"
-                status_class = "bg-warning text-dark"
-            else:
-                status_text = "В пределах лимита"
-                status_class = "bg-success text-white"
-        else:
-            status_text = "Лимит не установлен"
-            status_class = "bg-light text-dark"
-
-        categories_data.append({
-            "category": category,
-            "spent": spent,
-            "limit": limit,
-            "percent": percent,
-            "status_text": status_text,
-            "status_class": status_class,
-        })
+    # Считаем лимиты за тот же период, что и статистику
+    categories_data = calculate_category_limits_data(request.user, start_date, end_date)
 
     context = {
         'category_stats': category_stats.to_dict() if not category_stats.empty else {},
@@ -515,9 +585,10 @@ def statistics(request):
         'category_percentages': category_percentages.to_dict() if not category_percentages.empty else {},
         'graphic': graphic,
         'categories_data': categories_data,
-        'start_date': start_date,
-        'end_date': end_date,
-        'no_data': False
+        # Передаём строки дат, чтобы форма в шаблоне сохранила выбор
+        'start_date': request.GET.get('start_date'),
+        'end_date': request.GET.get('end_date'),
+        'no_data': False,
     }
     return render(request, 'expense_app/statistics.html', context)
 

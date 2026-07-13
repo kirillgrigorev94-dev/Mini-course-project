@@ -97,10 +97,18 @@
     </div>
 {% endif %}
 
-<!-- Блок лимитов по категориям (текущий месяц) -->
+<!-- Блок лимитов по категориям -->
 <div class="card mb-4">
   <div class="card-header">
-    <h5>Лимиты по категориям (текущий месяц)</h5>
+    <h5>Лимиты по категориям
+      {% if start_date and end_date %}
+        (с {{ start_date }} по {{ end_date }})
+      {% elif start_date %}
+        (с {{ start_date }} до сегодня)
+      {% else %}
+        (за все время)
+      {% endif %}
+    </h5>
   </div>
   <div class="card-body">
     {% if categories_data %}
