@@ -200,9 +200,9 @@ def expenses_list(request):
     
     # Применяем фильтрацию по датам
     if start_date:
-        expenses = expenses.filter(date_gte=start_date)
+        expenses = expenses.filter(date__gte=start_date)
     if end_date:
-        expenses = expenses.filter(date_lte=end_date)
+        expenses = expenses.filter(date__lte=end_date)
 
     if export_format == 'csv':
         return export_to_csv(request)  # Передаём отфильтрованные данные
