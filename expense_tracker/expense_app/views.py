@@ -211,31 +211,6 @@ def expenses_list(request):
     
     # Считаем лимиты за выбранный период
     categories_data = calculate_category_limits_data(request.user, start_date, end_date)
-    
-# --- ДОБАВЛЕНО: расчёт лимитов по категориям ---
-    categories_data = []
-    for category in Category.objects.all():
-        spent = get_category_spent_this_month(request.user, category)
-        limit = category.monthly_limit
-        percent = 0.0
-        status = 'ok'  # ok / warning / over
-        if limit and limit > 0:
-            percent = min(100.0, (spent / limit) * 100)
-            if percent >= 100:
-                status = 'over'
-            elif percent >= 80:
-                status = 'warning'
-        else:
-            # Если лимита нет — считаем как «без лимита», статус нейтральный
-            status = 'no_limit'
-
-        categories_data.append({
-            'category': category,
-            'spent': spent,
-            'limit': limit,
-            'percent': percent,
-            'status': status,
-        })
 
     # Настройка пагинации
     paginator = Paginator(expenses, 10) # 10 записей на страницу
@@ -509,6 +484,10 @@ def download_csv(request):
 def statistics(request):
     # Получаем диапазон дат из GET-параметров
     start_date, end_date = get_date_range(request)
+    
+    # Если даты есть, форматируем их в вид "31.10.2023", иначе оставляем None
+    display_start = start_date.strftime('%d.%m.%Y') if start_date else None
+    display_end = end_date.strftime('%d.%m.%Y') if end_date else None
 
     # Фильтруем расходы по пользователю и категории
     expenses = Expense.objects.filter(user=request.user).select_related('category')
@@ -527,9 +506,12 @@ def statistics(request):
             'category_percentages': {},
             'graphic': None,
             'categories_data': [],
-            # Передаём даты в формате ISO, чтобы форма в шаблоне их подхватила
-            'start_date': start_date.isoformat() if start_date else None,
-            'end_date': end_date.isoformat() if end_date else None,
+            # Передаём строки дат, чтобы форма в шаблоне сохранила выбор
+            'start_date': request.GET.get('start_date'),
+            'end_date': request.GET.get('end_date'),
+            # Для заголовка нужны строки DD.MM.YYYY
+            'display_start': display_start,
+            'display_end': display_end,
             'no_data': True,
         }
         return render(request, 'expense_app/statistics.html', context)
@@ -588,6 +570,9 @@ def statistics(request):
         # Передаём строки дат, чтобы форма в шаблоне сохранила выбор
         'start_date': request.GET.get('start_date'),
         'end_date': request.GET.get('end_date'),
+        # Для заголовка нужны строки DD.MM.YYYY
+        'display_start': display_start,
+        'display_end': display_end,
         'no_data': False,
     }
     return render(request, 'expense_app/statistics.html', context)

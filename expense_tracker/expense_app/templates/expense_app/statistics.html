@@ -13,13 +13,13 @@
         <div class="col-md-3">
             <label for="start_date" class="form-label">Начальная дата</label>
             <input type="date" name="start_date" id="start_date" class="form-control"
-                   value="{{ start_date }}">
+                  {% if start_date %}value="{{ start_date }}"{% endif %}>
         </div>
 
         <div class="col-md-3">
-            <label for="end_date" class="form-label">Коконечная дата</label>
+            <label for="end_date" class="form-label">Конечная дата</label>
             <input type="date" name="end_date" id="end_date" class="form-control"
-                   value="{{ end_date }}">
+                  {% if end_date %}value="{{ end_date }}"{% endif %}>
         </div>
 
         <div class="col-md-2">
@@ -101,10 +101,10 @@
 <div class="card mb-4">
   <div class="card-header">
     <h5>Лимиты по категориям
-      {% if start_date and end_date %}
-        (с {{ start_date }} по {{ end_date }})
-      {% elif start_date %}
-        (с {{ start_date }} до сегодня)
+      {% if display_start and display_end %}
+        (с {{ display_start }} по {{ display_end }})
+      {% elif display_start %}
+        (с {{ display_start }} до сегодня)
       {% else %}
         (за все время)
       {% endif %}
