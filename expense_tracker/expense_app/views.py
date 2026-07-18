@@ -30,6 +30,22 @@ from reportlab.lib.colors import CMYKColor
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, LongTable, TableStyle, Paragraph, Spacer
 
+def format_date_for_input(value):
+    """
+    Преобразует дату в строку формата YYYY-MM-DD для value в <input type="date">.
+    Если значение None или не дата — возвращает пустую строку.
+    """
+    if not value:
+        return ''
+    if isinstance(value, str):
+        # Если уже строка — проверяем, что это валидная дата, иначе пустая
+        try:
+            date.fromisoformat(value)
+            return value
+        except ValueError:
+            return ''
+    # Для объектов date/datetime
+    return value.strftime('%Y-%m-%d')
 
 def get_date_range(request):
     """
@@ -229,9 +245,9 @@ def expenses_list(request):
         'paginator': paginator,
         'page_obj': page_obj,
         'categories_data': categories_data,
-        # Передаём даты, чтобы форма в шаблоне сохраняла выбор
-        'start_date': request.GET.get('start_date'),
-        'end_date': request.GET.get('end_date'),
+        # Используем нормализованные значения для value в шаблоне
+        'start_date': format_date_for_input(request.GET.get('start_date')) or '',
+        'end_date': format_date_for_input(request.GET.get('end_date')) or '',
     }
     return render(request, 'expense_app/expenses_list.html', context)
 

@@ -30,7 +30,7 @@
           name="start_date"
           id="start_date"
           class="form-control"
-          value="{{ start_date }}"
+          value="{{ start_date|default:"" }}"
         />
       </div>
       <div class="col-md-2">
@@ -40,7 +40,7 @@
           name="end_date"
           id="end_date"
           class="form-control"
-          value="{{ end_date }}"
+          value="{{ end_date|default:"" }}"
         />
       </div>
       <div class="col-md-3">
@@ -50,7 +50,7 @@
           name="min_amount"
           id="min_amount"
           class="form-control"
-          value="{{ min_amount }}"
+          value="{{ min_amount|default:'' }}"
           placeholder="Минимальная сумма"
         />
       </div>
@@ -61,7 +61,7 @@
           name="max_amount"
           id="max_amount"
           class="form-control"
-          value="{{ max_amount }}"
+          value="{{ max_amount|default:'' }}"
           placeholder="Максимальная сумма"
         />
       </div>
