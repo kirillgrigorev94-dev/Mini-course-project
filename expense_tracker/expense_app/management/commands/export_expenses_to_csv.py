@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
-from expense_app.views import export_to_csv, get_filtered_expenses
+from expense_app.views import get_filtered_expenses, generate_expense_csv_content
 from datetime import date
 import os
 from django.conf import settings
@@ -40,8 +40,7 @@ class Command(BaseCommand):
             expenses = get_filtered_expenses(user, fake_request)
 
             # Генерируем CSV
-            response = export_to_csv(fake_request, expenses)
-            csv_content = response.content
+            csv_content = generate_expense_csv_content(expenses)
 
             # Сохраняем на диск
             today = date.today().strftime('%Y%m%d')
@@ -52,7 +51,7 @@ class Command(BaseCommand):
             
             filepath = os.path.join(export_dir, filename)
 
-            with open(filepath, 'wb') as f:
+            with open(filepath, 'w', newline='', encoding='utf-8-sig') as f:
                 f.write(csv_content)
             self.stdout.write(self.style.SUCCESS(f'Сохранён: {filepath}'))
 

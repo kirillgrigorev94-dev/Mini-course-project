@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import json
 import base64
 import csv
-from io import BytesIO
+from io import BytesIO, StringIO
 from .models import Expense, Category, Tag, get_category_spent_this_month
 from .forms import ExpenseForm, ExpenseTemplate, ExpenseTemplateForm
 from datetime import date
@@ -198,6 +198,39 @@ def get_filtered_expenses(user, request):
 
     return expenses
 
+def generate_expense_csv_content(expenses):
+    """
+    Возвращает CSV-контент (строку) для переданного QuerySet расходов.
+    
+    Эта функция НЕ зависит от request и НЕ возвращает HttpResponse — 
+    она просто формирует текст CSV. Её можно использовать и в views, и в management-командах.
+    
+    Args:
+        expenses: QuerySet объектов Expense
+        
+    Returns:
+        str: CSV-контент с BOM для корректного отображения кириллицы в Excel
+    """
+
+    output = StringIO()
+    # BOM для корректного отображения кириллицы в Excel
+    output.write('\ufeff')
+
+    writer = csv.writer(output)
+    writer.writerow(['Дата', 'Категория', 'Сумма (руб.)', 'Комментарий', 'Теги'])
+
+    for expense in expenses:
+        tags_list = [tag.name for tag in expense.tags.all()]
+        writer.writerow([
+            expense.date.strftime('%d.%m.%Y'),
+            expense.category.name,
+            f"{expense.amount:.2f}",
+            expense.description or '',
+            ', '.join(tags_list)
+        ])
+
+    return output.getvalue()
+
 # Главная страница приложения (доступна только авторизованным пользователям)
 def index(request):
     return render(request, 'expense_app/index.html')
@@ -258,27 +291,13 @@ def export_to_csv(request):
     Экспортирует отфильтрованные расходы текущего пользователя в CSV-файл.
     Фильтрация выполняется по тем же правилам, что и в expenses_list.
     """
-    # Получаем отфильтрованные расходы точно так же, как в expenses_list
     expenses = get_filtered_expenses(request.user, request)
 
-    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    # Генерируем полный CSV-контент (BOM + заголовки + строки)
+    csv_content = generate_expense_csv_content(expenses)
+
+    response = HttpResponse(csv_content, content_type='text/csv; charset=utf-8')
     response['Content-Disposition'] = 'attachment; filename="расходы.csv"'
-
-    # BOM для корректного отображения кириллицы в Excel
-    response.write('\ufeff'.encode('utf-8'))
-
-    writer = csv.writer(response)
-    writer.writerow(['Дата', 'Категория', 'Сумма (руб.)', 'Комментарий', 'Теги'])
-
-    for expense in expenses:
-        tags_list = [tag.name for tag in expense.tags.all()]
-        writer.writerow([
-            expense.date.strftime('%d.%m.%Y'),
-            expense.category.name,
-            f"{expense.amount:.2f}",
-            expense.description,
-            ', '.join(tags_list)
-        ])
 
     return response
 
